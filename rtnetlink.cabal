@@ -13,12 +13,13 @@ description:        A high-level, extensible, pure Haskell interface to the
 license:            BSD3
 license-file:       LICENSE
 author:             Ben Hamlin
-maintainer:         protob3n@gmail.com
+maintainer:         Ben Hamlin <protob3n@gmail.com>
 copyright:          Formaltech Inc.
-category:           System
+category:           Network, System
 build-type:         Simple
 extra-source-files: ChangeLog.md
 cabal-version:      >=1.10
+homepage:           https://gitlab.com/formaltech/rtnetlink-hs
 
 source-repository head
     type:           git
