@@ -39,7 +39,7 @@ functions to make this easier.
 >   main :: IO ()
 >   main = runRTNL $ do
 >       let mybridge = LinkName "mybridge"
->       create (bridge mybridge)
+>       create (Bridge mybridge)
 >       change mybridge Up
 >       state <- dump mybridge
 >       when (head state == Up) $
