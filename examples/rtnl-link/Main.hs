@@ -18,37 +18,21 @@ usage = do
             ++ "\t| change (name <ifname> | index <ifindex>) (up | down)\n"
             ++ "\n"
             ++ "CREATE\n"
-            ++ "\t= bridge <ifname> BRIDGE_OPTS\n"
+            ++ "\t= TYPE <ifname> BRIDGE_OPTS\n"
             ++ "\n"
-            ++ "BRIDGE_OPTS\n"
-            ++ "\t= forward_delay <number>\n"
-            ++ "\t| hello_time <number>\n"
-            ++ "\t| max_age <number>\n"
-            ++ "\t| ageing_time <number>\n"
-            ++ "\t| stp_state <number>\n"
-            ++ "\t| priority <number>\n"
-
-bridgeOpts :: String -> [String] -> Bridge
-bridgeOpts name' opts' = Bridge name delay hello max_age ageing stp priority
-    where
-    name             = LinkName $ S.pack name'
-    delay            = read <$> lookup "forward_delay" opts
-    hello            = read <$> lookup "hello_time" opts
-    max_age          = read <$> lookup "max_age" opts
-    ageing           = read <$> lookup "ageing_time" opts
-    stp              = read <$> lookup "stp_state" opts
-    priority         = read <$> lookup "priority" opts
-    opts             = popts [] opts'
-    popts a []       = a
-    popts _ (_:[])   = error "Bridge option without a matching value"
-    popts a (p:q:os) = popts ((p,q):a) os
+            ++ "TYPE\n"
+            ++ "\t= bridge\n"
 
 main :: IO ()
 main = do
     args <- getArgs
     err  <- tryRTNL $ case args of
-        "create":"bridge":name:opts -> do
-            create $ bridgeOpts name opts
+        "create":"bridge":name':[] -> do
+            let name = LinkName $ S.pack name'
+            create $ Bridge name
+        "create":"dummy":name':[] -> do
+            let name = LinkName $ S.pack name'
+            create $ Dummy name
         "destroy":"name":name':[] -> do
             let name = LinkName $ S.pack name'
             destroy name

@@ -95,44 +95,36 @@ data AnyLink = AnyLink
     deriving (Show, Eq)
 instance Message AnyLink where
     type MessageHeader AnyLink = IfInfoMsg
-    messageHeader _            = IfInfoMsg 0 0 0
     messageAttrs  _            = mempty
 instance Request AnyLink where
     requestTypeNumber = const #{const RTM_GETLINK}
     requestNLFlags    = const dumpNLFlags
 
+-- | A dummy interface.
+data Dummy = Dummy LinkName
+    deriving (Show, Eq)
+instance Message Dummy where
+    type MessageHeader Dummy = IfInfoMsg
+    messageHeader (Dummy name) = messageHeader name
+    messageAttrs  (Dummy name) = messageAttrs name <> AttributeList
+        [ AttributeNest #{const IFLA_LINKINFO}
+            [ cStringAttr #{const IFLA_INFO_KIND} "dummy" ]
+        ]
+instance Create Dummy where
+    createTypeNumber = const #{const RTM_NEWLINK}
+
 -- | A bridge interface.
-data Bridge = Bridge
-    { bridgeName         :: LinkName
-    , bridgeForwardDelay :: Maybe Word32
-    , bridgeHelloTime    :: Maybe Word32
-    , bridgeMaxAge       :: Maybe Word32
-    , bridgeAgeingTime   :: Maybe Word32
-    , bridgeStpState     :: Maybe Word32
-    , bridgePriority     :: Maybe Word16
-    } deriving (Show, Eq)
+data Bridge = Bridge LinkName
+    deriving (Show, Eq)
 instance Message Bridge where
     type MessageHeader Bridge = IfInfoMsg
-    messageHeader Bridge {..} = messageHeader bridgeName
-    messageAttrs  Bridge {..} = messageAttrs bridgeName <> AttributeList
+    messageHeader (Bridge name) = messageHeader name
+    messageAttrs  (Bridge name) = messageAttrs name <> AttributeList
         [ AttributeNest #{const IFLA_LINKINFO}
-            [ cStringAttr   #{const IFLA_INFO_KIND} "bridge"
-            , AttributeNest #{const IFLA_INFO_DATA} $ catMaybes
-                [ word32Attr #{const IFLA_BR_FORWARD_DELAY} <$> bridgeForwardDelay
-                , word32Attr #{const IFLA_BR_HELLO_TIME}    <$> bridgeHelloTime
-                , word32Attr #{const IFLA_BR_MAX_AGE}       <$> bridgeMaxAge
-                , word32Attr #{const IFLA_BR_AGEING_TIME}   <$> bridgeAgeingTime
-                , word32Attr #{const IFLA_BR_STP_STATE}     <$> bridgeStpState
-                , word16Attr #{const IFLA_BR_PRIORITY}      <$> bridgePriority
-                ]
-            ]
+            [ cStringAttr #{const IFLA_INFO_KIND} "bridge" ]
         ]
 instance Create Bridge where
     createTypeNumber = const #{const RTM_NEWLINK}
-
--- | A bridge with default parameters.
-bridge :: LinkName -> Bridge
-bridge name = Bridge name Nothing Nothing Nothing Nothing Nothing Nothing
 
 -- | The state of a link.
 data LinkState = Up | Down
