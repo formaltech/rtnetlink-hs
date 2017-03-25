@@ -15,7 +15,10 @@ Portability : Linux
 {-# LANGUAGE TypeFamilies #-}
 module System.Linux.RTNetlink.Address where
 
-import Data.Serialize
+import Control.Monad (guard)
+import Data.Monoid (mempty)
+import Data.Serialize (Serialize, Get, Putter, get, put, runPut)
+import Data.Serialize (getWord32host, putWord32host, getWord8, putWord8)
 import Data.Word (Word8, Word32)
 import System.Socket.Family.Inet (InetAddress, inetAddressToTuple, inetAddressFromTuple)
 
@@ -36,22 +39,53 @@ getInetAddress :: Get InetAddress
 getInetAddress = inetAddressFromTuple <$> getTuple
     where getTuple = (,,,) <$> getWord8 <*> getWord8 <*> getWord8 <*> getWord8
 
+-- | Interface wildcard. Use this to get information about all layer-3
+-- interfaces.
+data AnyInterface = AnyInterface
+    deriving (Show, Eq)
+instance Message AnyInterface where
+    type MessageHeader AnyInterface = IfAddrMsg
+    messageAttrs       AnyInterface = mempty
+instance Request AnyInterface where
+    requestTypeNumber = const #{const RTM_GETADDR}
+    requestNLFlags    = const dumpNLFlags
+
+-- | The index of a layer-3 interface.
+newtype IfIndex = IfIndex Word32
+    deriving (Show, Eq, Num, Ord)
+instance Message IfIndex where
+    type MessageHeader IfIndex = IfAddrMsg
+    messageHeader (IfIndex ix) = IfAddrMsg 0 0 0 0 ix
+    messageAttrs  _            = AttributeList []
+
 -- | An address and netmask associated with an interface.
 data IfInetAddress = IfInetAddress
     { ifInetAddress :: InetAddress -- ^ The ip4v address itself.
     , ifInetPrefix  :: Word8       -- ^ The netmask.
-    , ifInetIfIndex :: Word32      -- ^ Index of the associated interface.
+    , ifInetIfIndex :: IfIndex     -- ^ Index of the associated interface.
     } deriving (Show, Eq)
 instance Message IfInetAddress where
     type MessageHeader IfInetAddress = IfAddrMsg
     messageHeader IfInetAddress {..} =
-        IfAddrMsg #{const AF_INET} ifInetPrefix 0 0 ifInetIfIndex
+        hdr {addrFamily = #{const AF_INET}, addrPrefix = ifInetPrefix}
+        where hdr = messageHeader ifInetIfIndex
     messageAttrs  IfInetAddress {..} = AttributeList
         [ Attribute #{const RTA_SRC} ip4
         , Attribute #{const RTA_DST} ip4
         ] where ip4 = runPut $ putInetAddress ifInetAddress
 instance Create IfInetAddress where
     createTypeNumber = const #{const RTM_NEWADDR}
+instance Destroy IfInetAddress where
+    destroyTypeNumber = const #{const RTM_DELADDR}
+instance Reply IfInetAddress where
+    type ReplyHeader IfInetAddress = IfAddrMsg
+    replyTypeNumbers _             = [#{const RTM_NEWADDR}]
+    fromNLMessage NLMessage {..}   = do
+        let IfAddrMsg {..} = nlmHeader
+        guard $ addrFamily == #{const AF_INET}
+        attr <- findAttribute [#{const RTA_DST}] nlmAttrs
+        inet <- runGetMaybe getInetAddress =<< attributeData attr
+        return $ IfInetAddress inet addrPrefix (IfIndex addrIndex)
 
 -- | The header corresponding to address messages, based on 'struct ifaddrmsg'
 -- from 'linux/if_addr.h'.

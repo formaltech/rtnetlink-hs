@@ -176,7 +176,7 @@ class Header (ReplyHeader r) => Reply r where
     replyTypeNumbers :: r -> [TypeNumber]
     -- | Interpret a received NLMessage.
     fromNLMessage    :: NLMessage (ReplyHeader r) -> Maybe r
-    -- | Like 'fromNLMessage', but check to make sure the top-level type
+    -- | Like 'fromNLMessage', but checks to make sure the top-level type
     -- number is in 'replyTypeNumbers', first.
     fromNLMessage'   :: NLMessage (ReplyHeader r) -> Maybe r
     fromNLMessage' m = do
@@ -201,3 +201,6 @@ instance Reply C.Errno where
 
 decodeMaybe :: Serialize a => S.ByteString -> Maybe a
 decodeMaybe = either (const Nothing) Just . decode
+
+runGetMaybe :: Get a -> S.ByteString -> Maybe a
+runGetMaybe g = either (const Nothing) Just . runGet g
