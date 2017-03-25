@@ -52,8 +52,8 @@ newtype LinkName = LinkName S.ByteString
     deriving (Show, Eq)
 instance Message LinkName where
     type MessageHeader LinkName = IfInfoMsg
-    messageHeader _             = IfInfoMsg 0 0 0
-    messageAttrs  (LinkName bs) = AttributeList [cStringAttr #{const IFLA_IFNAME} bs]
+    messageAttrs  (LinkName bs) = AttributeList
+        [cStringAttr #{const IFLA_IFNAME} $ S.take #{const IFNAMSIZ} bs]
 instance Destroy LinkName where
     destroyTypeNumber = const #{const RTM_DELLINK}
 instance Request LinkName where
@@ -80,7 +80,6 @@ instance Serialize LinkEther where
     get = LinkEther <$> get <*> get <*> get <*> get <*> get <*> get
 instance Message LinkEther where
     type MessageHeader LinkEther = IfInfoMsg
-    messageHeader _ = IfInfoMsg 0 0 0
     messageAttrs  e = AttributeList [Attribute #{const IFLA_ADDRESS} $ encode e]
 instance Reply LinkEther where
     type ReplyHeader LinkEther = IfInfoMsg
@@ -118,7 +117,6 @@ data Bridge = Bridge LinkName
     deriving (Show, Eq)
 instance Message Bridge where
     type MessageHeader Bridge = IfInfoMsg
-    messageHeader (Bridge name) = messageHeader name
     messageAttrs  (Bridge name) = messageAttrs name <> AttributeList
         [ AttributeNest #{const IFLA_LINKINFO}
             [ cStringAttr #{const IFLA_INFO_KIND} "bridge" ]
@@ -172,4 +170,5 @@ instance Serialize IfInfoMsg where
         ifFlags  <- getWord32host
         ifChange <- getWord32host
         return $ IfInfoMsg {..}
-instance Header IfInfoMsg
+instance Header IfInfoMsg where
+    emptyHeader = IfInfoMsg 0 0 0

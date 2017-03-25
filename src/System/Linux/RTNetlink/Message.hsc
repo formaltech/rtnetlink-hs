@@ -83,25 +83,30 @@ instance Sized NLMsgErr where
 instance Serialize NLMsgErr where
     put NLMsgErr {..} = putInt32host nleError >> put nleHeader
     get               = NLMsgErr <$> getInt32le <*> get
-instance Header NLMsgErr
+instance Header NLMsgErr where
+    emptyHeader = NLMsgErr 0 $ NLMsgHdr 0 0 0 0 0
 
 -- | Class of things that can be used as second-level netlink headers.
-class (Show h, Eq h, Sized h, Serialize h) => Header h
-instance Header ()
+class (Show h, Eq h, Sized h, Serialize h) => Header h where
+    -- | Default header for a message, if none is specified.
+    emptyHeader :: h
+instance Header () where
+    emptyHeader = ()
 
 -- | Class of things that can be sent as messages.
 class Header (MessageHeader m) => Message m where
     -- | The type of header to attach to the message.
     type MessageHeader m
-    -- | Construct a header corresponding to a message.
+    -- | Construct a header corresponding to a message. Defaults to `emptyHeader`.
     messageHeader :: m -> MessageHeader m
+    messageHeader = const emptyHeader
     -- | Construct netlink attributes corresponding to a message.
     messageAttrs  :: m -> AttributeList
     -- | Produce an NLMessage suitable for sending over the wire.
     toNLMessage   ::
         m -> TypeNumber -> NLFlags -> SequenceNumber -> NLMessage (MessageHeader m)
     toNLMessage m = NLMessage (messageHeader m) (messageAttrs m)
-    {-# MINIMAL messageHeader, messageAttrs #-}
+    {-# MINIMAL messageAttrs #-}
 
 -- | Class of 'Message's representing things that can be created.
 class Message c => Create c where

@@ -77,4 +77,5 @@ instance Serialize IfAddrMsg where
         <*> getWord8
         <*> getWord8
         <*> getWord32host
-instance Header IfAddrMsg
+instance Header IfAddrMsg where
+    emptyHeader = IfAddrMsg 0 0 0 0 0
