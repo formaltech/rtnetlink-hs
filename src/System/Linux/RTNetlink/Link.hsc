@@ -10,6 +10,7 @@ Portability : Linux
 -}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -18,10 +19,9 @@ module System.Linux.RTNetlink.Link where
 
 import Data.Bits ((.&.))
 import Data.Int (Int32)
-import Data.Maybe (catMaybes)
 import Data.Monoid ((<>))
 import Data.Serialize
-import Data.Word (Word8, Word16, Word32)
+import Data.Word (Word8, Word32)
 import qualified Data.ByteString as S
 
 import System.Linux.RTNetlink.Packet
@@ -33,7 +33,7 @@ import System.Linux.RTNetlink.Message
 
 -- | A link identified by its index.
 newtype LinkIndex = LinkIndex Int
-    deriving (Show, Eq)
+    deriving (Show, Eq, Num, Ord)
 instance Message LinkIndex where
     type MessageHeader LinkIndex = IfInfoMsg
     messageHeader (LinkIndex ix) = IfInfoMsg (fromIntegral ix) 0 0
@@ -100,7 +100,7 @@ instance Request AnyLink where
     requestNLFlags    = const dumpNLFlags
 
 -- | A dummy interface.
-data Dummy = Dummy LinkName
+newtype Dummy = Dummy LinkName
     deriving (Show, Eq)
 instance Message Dummy where
     type MessageHeader Dummy = IfInfoMsg
@@ -113,7 +113,7 @@ instance Create Dummy where
     createTypeNumber = const #{const RTM_NEWLINK}
 
 -- | A bridge interface.
-data Bridge = Bridge LinkName
+newtype Bridge = Bridge LinkName
     deriving (Show, Eq)
 instance Message Bridge where
     type MessageHeader Bridge = IfInfoMsg

@@ -13,27 +13,43 @@ usage = do
     putStrLn $ "Usage: " ++ prog ++ " COMMAND\n"
             ++ "\n"
             ++ "COMMAND\n"
-            ++ "\t= create <ip4>/<mask> index <ifindex>\n"
-            ++ "\t| destroy <ip4>/<mask> index <ifindex>\n"
-            ++ "\t| dump\n"
+            ++ "\t= create ipv4 <ipv4>/<mask> index <ifindex>\n"
+            ++ "\t= create ipv6 <ipv6>/<mask> index <ifindex>\n"
+            ++ "\t| destroy ipv4 <ipv4>/<mask> index <ifindex>\n"
+            ++ "\t| destroy ipv6 <ipv6>/<mask> index <ifindex>\n"
+            ++ "\t| dump ipv4\n"
+            ++ "\t| dump ipv6\n"
 
 main :: IO ()
 main = do
     args <- getArgs
     err  <- tryRTNL $ case args of
-        "create":ip4':"index":ix':[] -> do
+        "create":"ipv4":ipv4:"index":ix':[] -> do
             let ix          = IfIndex $ read ix'
-                [a,b,c,d,m] = fmap read . splitOneOf "./" $ ip4'
+                [a,b,c,d,m] = fmap read . splitOneOf "./" $ ipv4
                 address     = inetAddressFromTuple (a,b,c,d)
             create $ IfInetAddress address m ix
-        "destroy":ip4':"index":ix':[] -> do
+        "create":"ipv6":ipv6:"index":ix':[] -> do
+            let ix                  = IfIndex $ read ix'
+                [a,b,c,d,e,f,g,h,m] = fmap read . splitOneOf "./" $ ipv6
+                address             = inetAddressFromTuple (a,b,c,d)
+            create $ IfInetAddress address m ix
+        "destroy":"ipv4":ipv4:"index":ix':[] -> do
             let ix          = IfIndex $ read ix'
-                [a,b,c,d,m] = fmap read . splitOneOf "./" $ ip4'
+                [a,b,c,d,m] = fmap read . splitOneOf "./" $ ipv4
                 address     = inetAddressFromTuple (a,b,c,d)
             destroy $ IfInetAddress address m ix
-        "dump":[] -> do
+        "destroy":"ipv6":ipv6:"index":ix':[] -> do
+            let ix                  = IfIndex $ read ix'
+                [a,b,c,d,e,f,g,h,m] = fmap read . splitOneOf "./" $ ipv6
+                address             = inetAddressFromTuple (a,b,c,d)
+            destroy $ IfInetAddress address m ix
+        "dump":"ipv4":[] -> do
             addresses <- dump AnyInterface
             liftIO $ mapM_ (putStrLn . show) (addresses::[IfInetAddress])
+        "dump":"ipv6":[] -> do
+            addresses <- dump AnyInterface
+            liftIO $ mapM_ (putStrLn . show) (addresses::[IfInet6Address])
         _ -> liftIO usage
     case err of
         Left  s  -> putStrLn $ "Error: " ++ s

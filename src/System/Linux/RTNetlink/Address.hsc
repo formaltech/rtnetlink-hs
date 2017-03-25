@@ -10,6 +10,7 @@ Portability : Linux
 -}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -18,9 +19,13 @@ module System.Linux.RTNetlink.Address where
 import Control.Monad (guard)
 import Data.Monoid (mempty)
 import Data.Serialize (Serialize, Get, Putter, get, put, runPut)
-import Data.Serialize (getWord32host, putWord32host, getWord8, putWord8)
+import Data.Serialize (getWord32host, putWord32host, getWord8)
+import Data.Serialize (putWord8, getWord16be, putWord16be)
 import Data.Word (Word8, Word32)
-import System.Socket.Family.Inet (InetAddress, inetAddressToTuple, inetAddressFromTuple)
+import System.Socket.Family.Inet (InetAddress, inetAddressToTuple)
+import System.Socket.Family.Inet (inetAddressFromTuple)
+import System.Socket.Family.Inet6 (Inet6Address, inet6AddressToTuple)
+import System.Socket.Family.Inet6 (inet6AddressFromTuple)
 
 import System.Linux.RTNetlink.Message
 import System.Linux.RTNetlink.Packet
@@ -38,6 +43,25 @@ putInetAddress i = putWord8 a >> putWord8 b >> putWord8 c >> putWord8 d
 getInetAddress :: Get InetAddress
 getInetAddress = inetAddressFromTuple <$> getTuple
     where getTuple = (,,,) <$> getWord8 <*> getWord8 <*> getWord8 <*> getWord8
+
+-- | Construct a network-byte-order representation of an 'InetAddress'.
+putInet6Address :: Putter Inet6Address
+putInet6Address i = mapM_ putWord16be [a,b,c,d,e,f,g,h]
+    where (a,b,c,d,e,f,g,h) = inet6AddressToTuple i
+
+-- | Parse a network-byte-order representation of an 'Inet6Address'.
+getInet6Address :: Get Inet6Address
+getInet6Address = inet6AddressFromTuple <$> getTuple
+    where
+    getTuple = (,,,,,,,)
+        <$> getWord16be
+        <*> getWord16be
+        <*> getWord16be
+        <*> getWord16be
+        <*> getWord16be
+        <*> getWord16be
+        <*> getWord16be
+        <*> getWord16be
 
 -- | Interface wildcard. Use this to get information about all layer-3
 -- interfaces.
@@ -58,7 +82,7 @@ instance Message IfIndex where
     messageHeader (IfIndex ix) = IfAddrMsg 0 0 0 0 ix
     messageAttrs  _            = AttributeList []
 
--- | An address and netmask associated with an interface.
+-- | An ipv4 address and netmask associated with an interface.
 data IfInetAddress = IfInetAddress
     { ifInetAddress :: InetAddress -- ^ The ip4v address itself.
     , ifInetPrefix  :: Word8       -- ^ The netmask.
@@ -70,9 +94,9 @@ instance Message IfInetAddress where
         hdr {addrFamily = #{const AF_INET}, addrPrefix = ifInetPrefix}
         where hdr = messageHeader ifInetIfIndex
     messageAttrs  IfInetAddress {..} = AttributeList
-        [ Attribute #{const RTA_SRC} ip4
-        , Attribute #{const RTA_DST} ip4
-        ] where ip4 = runPut $ putInetAddress ifInetAddress
+        [ Attribute #{const RTA_SRC} ipv4
+        , Attribute #{const RTA_DST} ipv4
+        ] where ipv4 = runPut $ putInetAddress ifInetAddress
 instance Create IfInetAddress where
     createTypeNumber = const #{const RTM_NEWADDR}
 instance Destroy IfInetAddress where
@@ -84,8 +108,37 @@ instance Reply IfInetAddress where
         let IfAddrMsg {..} = nlmHeader
         guard $ addrFamily == #{const AF_INET}
         attr <- findAttribute [#{const RTA_DST}] nlmAttrs
-        inet <- runGetMaybe getInetAddress =<< attributeData attr
-        return $ IfInetAddress inet addrPrefix (IfIndex addrIndex)
+        ipv4 <- runGetMaybe getInetAddress =<< attributeData attr
+        return $ IfInetAddress ipv4 addrPrefix (IfIndex addrIndex)
+
+-- | An ipv6 address and netmask associated with an interface.
+data IfInet6Address = IfInet6Address
+    { ifInet6Address :: Inet6Address -- ^ The ip4v address itself.
+    , ifInet6Prefix  :: Word8       -- ^ The netmask.
+    , ifInet6IfIndex :: IfIndex     -- ^ Index of the associated interface.
+    } deriving (Show, Eq)
+instance Message IfInet6Address where
+    type MessageHeader IfInet6Address = IfAddrMsg
+    messageHeader IfInet6Address {..} =
+        hdr {addrFamily = #{const AF_INET6}, addrPrefix = ifInet6Prefix}
+        where hdr = messageHeader ifInet6IfIndex
+    messageAttrs  IfInet6Address {..} = AttributeList
+        [ Attribute #{const RTA_SRC} ipv6
+        , Attribute #{const RTA_DST} ipv6
+        ] where ipv6 = runPut $ putInet6Address ifInet6Address
+instance Create IfInet6Address where
+    createTypeNumber = const #{const RTM_NEWADDR}
+instance Destroy IfInet6Address where
+    destroyTypeNumber = const #{const RTM_DELADDR}
+instance Reply IfInet6Address where
+    type ReplyHeader IfInet6Address = IfAddrMsg
+    replyTypeNumbers _             = [#{const RTM_NEWADDR}]
+    fromNLMessage NLMessage {..}   = do
+        let IfAddrMsg {..} = nlmHeader
+        guard $ addrFamily == #{const AF_INET6}
+        attr <- findAttribute [#{const RTA_DST}] nlmAttrs
+        ipv6 <- runGetMaybe getInet6Address =<< attributeData attr
+        return $ IfInet6Address ipv6 addrPrefix (IfIndex addrIndex)
 
 -- | The header corresponding to address messages, based on 'struct ifaddrmsg'
 -- from 'linux/if_addr.h'.
