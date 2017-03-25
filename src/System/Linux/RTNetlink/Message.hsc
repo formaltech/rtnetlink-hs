@@ -178,11 +178,6 @@ class Header (ReplyHeader r) => Reply r where
     fromNLMessage    :: NLMessage (ReplyHeader r) -> Maybe r
     -- | Like 'fromNLMessage', but checks to make sure the top-level type
     -- number is in 'replyTypeNumbers', first.
-    fromNLMessage'   :: NLMessage (ReplyHeader r) -> Maybe r
-    fromNLMessage' m = do
-        r <- fromNLMessage m
-        guard $ nlmType m `elem` replyTypeNumbers r
-        return r
     {-# MINIMAL replyTypeNumbers, fromNLMessage #-}
 instance Reply () where
     type ReplyHeader () = ()
@@ -196,6 +191,12 @@ instance Reply C.Errno where
     type ReplyHeader C.Errno = NLMsgErr
     replyTypeNumbers _       = [#{const NLMSG_ERROR}]
     fromNLMessage            = Just . C.Errno . abs . fromIntegral . nleError . nlmHeader
+
+fromNLMessage' :: Reply r => NLMessage (ReplyHeader r) -> Maybe r
+fromNLMessage' m = do
+    r <- fromNLMessage m
+    guard $ nlmType m `elem` replyTypeNumbers r
+    return r
 
 -- Util
 
