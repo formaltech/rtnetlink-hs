@@ -29,6 +29,7 @@ to perform.
 module System.Linux.RTNetlink.Message where
 
 import Control.Monad (guard)
+import Data.Monoid (mempty)
 import Data.Int (Int32)
 import Data.List (nub)
 import Data.Serialize
@@ -100,13 +101,14 @@ class Header (MessageHeader m) => Message m where
     -- | Construct a header corresponding to a message. Defaults to `emptyHeader`.
     messageHeader :: m -> MessageHeader m
     messageHeader = const emptyHeader
-    -- | Construct netlink attributes corresponding to a message.
+    -- | Construct netlink attributes corresponding to a message. Defaults to `mempty`.
     messageAttrs  :: m -> AttributeList
+    messageAttrs  = mempty
     -- | Produce an NLMessage suitable for sending over the wire.
     toNLMessage   ::
         m -> TypeNumber -> NLFlags -> SequenceNumber -> NLMessage (MessageHeader m)
     toNLMessage m = NLMessage (messageHeader m) (messageAttrs m)
-    {-# MINIMAL messageAttrs #-}
+    {-# MINIMAL #-}
 
 -- | Class of 'Message's representing things that can be created.
 class Message c => Create c where

@@ -26,12 +26,14 @@ main = do
             let ix          = IfIndex $ read ix'
                 [a,b,c,d,m] = fmap read . splitOneOf "./" $ ipv4
                 address     = inetAddressFromTuple (a,b,c,d)
-            create $ IfInetAddress address m ix
+                prefix      = IfPrefix m
+            create $ IfInetAddress address prefix ix
         "destroy":"ipv4":ipv4:"index":ix':[] -> do
             let ix          = IfIndex $ read ix'
                 [a,b,c,d,m] = fmap read . splitOneOf "./" $ ipv4
                 address     = inetAddressFromTuple (a,b,c,d)
-            destroy $ IfInetAddress address m ix
+                prefix      = IfPrefix m
+            destroy $ IfInetAddress address prefix ix
         "dump":"ipv4":[] -> do
             addresses <- dump AnyInterface
             liftIO $ mapM_ (putStrLn . show) (addresses::[IfInetAddress])

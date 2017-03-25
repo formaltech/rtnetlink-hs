@@ -37,7 +37,6 @@ newtype LinkIndex = LinkIndex Int
 instance Message LinkIndex where
     type MessageHeader LinkIndex = IfInfoMsg
     messageHeader (LinkIndex ix) = IfInfoMsg (fromIntegral ix) 0 0
-    messageAttrs  _              = mempty
 instance Destroy LinkIndex where
     destroyTypeNumber = const #{const RTM_DELLINK}
 instance Request LinkIndex where
@@ -94,7 +93,6 @@ data AnyLink = AnyLink
     deriving (Show, Eq)
 instance Message AnyLink where
     type MessageHeader AnyLink = IfInfoMsg
-    messageAttrs  _            = mempty
 instance Request AnyLink where
     requestTypeNumber = const #{const RTM_GETLINK}
     requestNLFlags    = const dumpNLFlags
