@@ -138,7 +138,9 @@ instance Serialize Attribute where
         skip $ sizeAligned 4 nla_data - size nla_data
         if nla_type .&. #{const NLA_F_NESTED} == 0
             then return $ Attribute nla_type nla_data
-            else AttributeNest (nla_type `xor` #{const NLA_F_NESTED}) <$> get
+            else do
+                AttributeList as <- get
+                return $ AttributeNest (nla_type `xor` #{const NLA_F_NESTED}) as
 
 -- | A collection of netlink attributes.
 newtype AttributeList = AttributeList [Attribute]
