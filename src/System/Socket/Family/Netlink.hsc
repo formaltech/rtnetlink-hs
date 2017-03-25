@@ -38,13 +38,13 @@ import System.Socket
 -- | Netlink socket family.
 data Netlink
 instance Family Netlink where
+    -- | Netlink address corresponding to @struct sockaddr_nl@ from
+    -- @linux/netlink.h@.
+    data SocketAddress Netlink = SocketAddressNetlink
+        { netlinkPid    :: Word32 -- ^ Netlink source address.
+        , netlinkGroups :: Word32 -- ^ Group subscription mask.
+        } deriving (Read, Show, Eq)
     familyNumber _ = #{const AF_NETLINK}
-
--- | Netlink address corresponding to @struct sockaddr_nl@ from @linux/netlink.h@.
-data instance SocketAddress Netlink = SocketAddressNetlink
-    { netlinkPid    :: Word32 -- ^ Netlink source address.
-    , netlinkGroups :: Word32 -- ^ Group subscription mask.
-    } deriving (Read, Show, Eq)
 instance Serialize (SocketAddress Netlink) where
     put nl = do
         putWord16host $ #{const AF_NETLINK}
