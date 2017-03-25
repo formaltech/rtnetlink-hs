@@ -14,9 +14,7 @@ usage = do
             ++ "\n"
             ++ "COMMAND\n"
             ++ "\t= create ipv4 <ipv4>/<mask> index <ifindex>\n"
-            ++ "\t= create ipv6 <ipv6>/<mask> index <ifindex>\n"
             ++ "\t| destroy ipv4 <ipv4>/<mask> index <ifindex>\n"
-            ++ "\t| destroy ipv6 <ipv6>/<mask> index <ifindex>\n"
             ++ "\t| dump ipv4\n"
             ++ "\t| dump ipv6\n"
 
@@ -29,20 +27,10 @@ main = do
                 [a,b,c,d,m] = fmap read . splitOneOf "./" $ ipv4
                 address     = inetAddressFromTuple (a,b,c,d)
             create $ IfInetAddress address m ix
-        "create":"ipv6":ipv6:"index":ix':[] -> do
-            let ix                  = IfIndex $ read ix'
-                [a,b,c,d,e,f,g,h,m] = fmap read . splitOneOf "./" $ ipv6
-                address             = inetAddressFromTuple (a,b,c,d)
-            create $ IfInetAddress address m ix
         "destroy":"ipv4":ipv4:"index":ix':[] -> do
             let ix          = IfIndex $ read ix'
                 [a,b,c,d,m] = fmap read . splitOneOf "./" $ ipv4
                 address     = inetAddressFromTuple (a,b,c,d)
-            destroy $ IfInetAddress address m ix
-        "destroy":"ipv6":ipv6:"index":ix':[] -> do
-            let ix                  = IfIndex $ read ix'
-                [a,b,c,d,e,f,g,h,m] = fmap read . splitOneOf "./" $ ipv6
-                address             = inetAddressFromTuple (a,b,c,d)
             destroy $ IfInetAddress address m ix
         "dump":"ipv4":[] -> do
             addresses <- dump AnyInterface
