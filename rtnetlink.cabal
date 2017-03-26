@@ -1,5 +1,5 @@
 name:               rtnetlink
-version:            0.1.0.0
+version:            0.1.0.1
 synopsis:           Manipulate network devices, addresses, and routes on Linux
 description:        A high-level, extensible, pure Haskell interface to the
                     ROUTE_NETLINK subsystem of netlink for manipulating
