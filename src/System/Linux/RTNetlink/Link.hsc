@@ -17,6 +17,7 @@ Portability : Linux
 {-# LANGUAGE TypeFamilies #-}
 module System.Linux.RTNetlink.Link where
 
+import Control.Applicative ((<$>), (<*>))
 import Data.Bits ((.&.))
 import Data.Int (Int32)
 import Data.Monoid ((<>))

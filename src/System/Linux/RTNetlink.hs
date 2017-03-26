@@ -70,11 +70,13 @@ module System.Linux.RTNetlink (
     , liftIO
     ) where
 
+import Control.Applicative (Applicative(..), (<$>))
 import Control.Monad (when, void)
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.Loops (unfoldM)
 import Control.Monad.State (MonadState, StateT, evalStateT)
 import Control.Monad.State (get, gets, put, modify, modify')
+import Data.Monoid (mempty)
 import Data.Either (partitionEithers)
 import Data.List (partition)
 import Data.Serialize (encode)
@@ -107,7 +109,7 @@ newtype RTNL a = RTNL {unRTNL :: StateT Handle IO a}
 -- | Run an RTNL function and catch all @IOError@s. This means that functions
 -- in this module are guaranteed not to throw uncaught exceptions.
 tryRTNL :: RTNL a -> IO (Either String a)
-tryRTNL = fmap (left (\e -> X.displayException (e::IOError))) . X.try . runRTNL
+tryRTNL = fmap (left (\e -> show (e::IOError))) . X.try . runRTNL
 
 -- | Run an RTNL function. RTNL functions in this module throw exclusively
 -- @IOError@s.

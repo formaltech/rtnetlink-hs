@@ -22,6 +22,7 @@ module System.Socket.Family.Netlink
     ) where
 
 import Data.Bits ((.|.))
+import Data.Functor ((<$>))
 import Data.Serialize (Serialize(..), encode, decode)
 import Data.Serialize (putWord16host, putWord32host, getWord16host, getWord32host)
 import Foreign.Ptr (castPtr)

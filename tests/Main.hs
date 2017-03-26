@@ -2,9 +2,10 @@
 module Main where
 
 import Control.Exception (bracket)
+import Data.Functor ((<$>))
+import System.Posix (getEffectiveUserID)
 import System.Socket.Family.Inet (inetAddressFromTuple)
 import System.Socket.Family.Inet6 (inet6AddressFromTuple)
-import System.Posix (getEffectiveUserID)
 
 import Test.Hspec
 

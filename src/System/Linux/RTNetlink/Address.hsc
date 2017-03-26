@@ -26,7 +26,9 @@ module System.Linux.RTNetlink.Address
     , Inet6Address
     ) where
 
+import Control.Applicative ((<$>), (<*>))
 import Control.Monad (guard)
+import Data.Monoid (mempty)
 import Data.Serialize (Serialize, Get, Putter, get, put, runPut)
 import Data.Serialize (getWord32host, putWord32host, getWord8)
 import Data.Serialize (putWord8, getWord16be, putWord16be)

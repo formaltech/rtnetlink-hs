@@ -28,10 +28,11 @@ to perform.
 {-# LANGUAGE TypeFamilies #-}
 module System.Linux.RTNetlink.Message where
 
+import Control.Applicative ((<$>), (<*>))
 import Control.Monad (guard)
-import Data.Monoid (mempty)
 import Data.Int (Int32)
 import Data.List (nub)
+import Data.Monoid (mempty)
 import Data.Serialize
 import Data.Word (Word16, Word32)
 import qualified Data.ByteString as S

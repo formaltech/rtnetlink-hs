@@ -33,15 +33,17 @@ module System.Linux.RTNetlink.Packet (
     , putAligned
     ) where
 
+import Control.Applicative ((<$>), (<*>))
 import Control.Monad (guard)
 import Control.Monad.Loops (unfoldM)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe (runMaybeT)
 import Data.Bits ((.|.), (.&.), xor)
 import Data.List (unfoldr, find)
+import Data.Maybe (listToMaybe)
+import Data.Monoid (Monoid, mempty, mappend)
 import Data.Serialize
 import Data.Word (Word16,Word32)
-import Data.Maybe (listToMaybe)
 import qualified Data.ByteString as S
 
 #include <linux/netlink.h>
