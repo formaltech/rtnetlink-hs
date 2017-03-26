@@ -25,6 +25,18 @@ flag examples
     description:    Build example programs
     default:        False
 
+test-suite rtnetlink-tests
+    default-language:   Haskell2010
+    type:               exitcode-stdio-1.0
+    hs-source-dirs:     tests
+    main-is:            Main.hs
+    build-depends:
+        base      >=4.9 && <4.10,
+        hspec     >=2.4 && <2.5,
+        socket    >=0.8 && <0.9,
+        unix      >=2.7 && <2.8,
+        rtnetlink
+
 executable rtnl-link
     if flag(examples)
         build-depends:
