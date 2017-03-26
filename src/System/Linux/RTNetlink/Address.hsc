@@ -116,15 +116,15 @@ instance Request AnyInterface where
     requestNLFlags    = const dumpNLFlags
 
 -- | The index of a layer-3 interface.
-newtype IfIndex = IfIndex {ifIndex :: Word32}
+newtype IfIndex = IfIndex {ifIndex :: Int}
     deriving (Show, Eq, Num, Ord)
 instance Message IfIndex where
     type MessageHeader IfIndex = IfAddrMsg
-    messageHeader (IfIndex ix) = IfAddrMsg 0 0 0 0 ix
+    messageHeader (IfIndex ix) = IfAddrMsg 0 0 0 0 (fromIntegral ix)
 instance Reply IfIndex where
     type ReplyHeader IfIndex = IfAddrMsg
     replyTypeNumbers _       = [#{const RTM_NEWADDR}]
-    fromNLMessage            = Just . IfIndex . addrIndex . nlmHeader
+    fromNLMessage            = Just . IfIndex . fromIntegral . addrIndex . nlmHeader
 
 -- | A netmask in CIDR notation.
 newtype IfPrefix = IfPrefix {ifPrefix :: Word8}
@@ -151,7 +151,7 @@ instance Message IfInetAddress where
         , addrPrefix = ifPrefix ifInetPrefix
         , addrFlags  = 0
         , addrScope  = 0
-        , addrIndex  = ifIndex ifInetIfIndex
+        , addrIndex  = fromIntegral $ ifIndex ifInetIfIndex
         }
 instance Create IfInetAddress where
     createTypeNumber = const #{const RTM_NEWADDR}
@@ -177,7 +177,7 @@ instance Message IfInet6Address where
         , addrPrefix = ifPrefix ifInet6Prefix
         , addrFlags  = 0
         , addrScope  = 0
-        , addrIndex  = ifIndex ifInet6IfIndex
+        , addrIndex  = fromIntegral $ ifIndex ifInet6IfIndex
         }
 instance Create IfInet6Address where
     createTypeNumber = const #{const RTM_NEWADDR}
