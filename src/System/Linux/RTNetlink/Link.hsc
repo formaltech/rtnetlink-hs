@@ -74,7 +74,7 @@ instance Show LinkEther where
         where
         hex w   = hexdig (w `div` 0x10) : hexdig (w `rem` 0x10) : []
         hexdig  = (!!) "0123456789abcdef" . fromIntegral
-        s <:> t = s ++ ":" ++ t
+        s <:> t = s ++ ":" ++ t :: String
 instance Serialize LinkEther where
     put (LinkEther a b c d e f) = put a >> put b >> put c >> put d >> put e >> put f
     get = LinkEther <$> get <*> get <*> get <*> get <*> get <*> get
