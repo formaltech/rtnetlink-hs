@@ -53,8 +53,6 @@ data RTNetlinkGroup
     | RTNetlinkGroupIPv4Netconf
     | RTNetlinkGroupIPv6Netconf
     | RTNetlinkGroupMDB
-    | RTNetlinkGroupMPLSRoute
-    | RTNetlinkGroupNSID
     deriving (Read, Show, Eq)
 instance NetlinkGroup RTNetlinkGroup where
     netlinkGroupNumber g = shift 1 $ bit g - 1
@@ -85,5 +83,3 @@ bit RTNetlinkGroupDCB          = #const RTNLGRP_DCB
 bit RTNetlinkGroupIPv4Netconf  = #const RTNLGRP_IPV4_NETCONF
 bit RTNetlinkGroupIPv6Netconf  = #const RTNLGRP_IPV6_NETCONF
 bit RTNetlinkGroupMDB          = #const RTNLGRP_MDB
-bit RTNetlinkGroupMPLSRoute    = #const RTNLGRP_MPLS_ROUTE
-bit RTNetlinkGroupNSID         = #const RTNLGRP_NSID
