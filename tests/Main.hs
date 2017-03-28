@@ -141,10 +141,11 @@ testCreate = do
 
         context "when given a bad interface index" $ do
             it "throws an exception" $ do
-                indices <- runRTNL $ dump AnyInterface
-                let badIx     = maximum indices + 1
-                    prefix    = IfPrefix 24
-                    interface = IfInetAddress testAddress4 prefix badIx
+                indices <- runRTNL $ dump AnyLink
+                let LinkIndex n = maximum indices + 1
+                    badIx       = IfIndex n
+                    prefix      = IfPrefix 24
+                    interface   = IfInetAddress testAddress4 prefix badIx
                 runRTNL (create interface) `shouldThrow` anyIOException
 
         context "when given a silly prefix" $ do
