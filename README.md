@@ -21,7 +21,7 @@ functions to make this easier.
 
 ## Example:
 
-```
+```haskell
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
