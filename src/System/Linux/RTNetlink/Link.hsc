@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-|
 Module      : System.Linux.RTNetlink.Link
 Description : ADTs for creating, destroying, modifying, and getting info
@@ -22,8 +23,10 @@ import Data.Bits ((.&.))
 import Data.Int (Int32)
 import Data.Monoid ((<>))
 import Data.Serialize
+import Data.String (IsString)
 import Data.Word (Word8, Word32)
 import qualified Data.ByteString as S
+import qualified Foreign.C.Error as C
 
 import System.Linux.RTNetlink.Packet
 import System.Linux.RTNetlink.Message
@@ -69,6 +72,10 @@ instance Reply LinkName where
         a <- findAttribute [#{const IFLA_IFNAME}] . nlmAttrs $ m
         n <- S.takeWhile (/=0) <$> attributeData a
         return $ LinkName n
+instance Dump LinkName LinkIndex
+instance Dump LinkName LinkName
+instance Dump LinkName LinkEther
+instance Dump LinkName LinkState
 
 -- | An ethernet address.
 data LinkEther = LinkEther Word8 Word8 Word8 Word8 Word8 Word8
@@ -101,6 +108,10 @@ instance Message AnyLink where
 instance Request AnyLink where
     requestTypeNumber = const #{const RTM_GETLINK}
     requestNLFlags    = const dumpNLFlags
+instance Dump AnyLink LinkIndex
+instance Dump AnyLink LinkName
+instance Dump AnyLink LinkEther
+instance Dump AnyLink LinkState
 
 -- | A dummy interface.
 newtype Dummy = Dummy LinkName

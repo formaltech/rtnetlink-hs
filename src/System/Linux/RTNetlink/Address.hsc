@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-|
 Module      : System.Linux.RTNetlink.Address
 Description : ADTs for creating, destroying, modifying, and getting info
@@ -37,6 +38,7 @@ import System.Socket.Family.Inet (InetAddress, inetAddressToTuple)
 import System.Socket.Family.Inet (inetAddressFromTuple)
 import System.Socket.Family.Inet6 (Inet6Address, inet6AddressToTuple)
 import System.Socket.Family.Inet6 (inet6AddressFromTuple)
+import qualified Foreign.C.Error as C
 
 import System.Linux.RTNetlink.Message
 import System.Linux.RTNetlink.Packet

@@ -168,7 +168,7 @@ destroy :: Destroy d => d -> RTNL ()
 destroy = talk_ . destroyNLMessage
 
 -- | Send a 'Request' and receive the associated 'Reply's.
-dump :: (Request q, Reply r) => q -> RTNL [r]
+dump :: Dump q r => q -> RTNL [r]
 dump = talk . requestNLMessage
 
 -- | Send a 'Change' message and ignore non-error 'Reply's.

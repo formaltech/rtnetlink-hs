@@ -195,6 +195,11 @@ instance Reply C.Errno where
     replyTypeNumbers _       = [#{const NLMSG_ERROR}]
     fromNLMessage            = Just . C.Errno . abs . fromIntegral . nleError . nlmHeader
 
+class (Request q, Reply r) => Dump q r
+instance Request q => Dump q ()
+instance Request q => Dump q C.Errno
+instance (Request q, Dump q r1, Dump q r2, ReplyHeader r1 ~ ReplyHeader r2) => Dump q (r1,r2)
+
 fromNLMessage' :: Reply r => NLMessage (ReplyHeader r) -> Maybe r
 fromNLMessage' m = do
     r <- fromNLMessage m
