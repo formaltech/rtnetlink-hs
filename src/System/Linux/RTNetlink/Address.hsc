@@ -116,10 +116,18 @@ instance Message AnyInterface where
 instance Request AnyInterface where
     requestTypeNumber = const #{const RTM_GETADDR}
     requestNLFlags    = const dumpNLFlags
+instance Dump AnyInterface ()
+instance Dump AnyInterface C.Errno
+instance Dump AnyInterface InetAddress
+instance Dump AnyInterface Inet6Address
+instance Dump AnyInterface IfIndex
+instance Dump AnyInterface IfPrefix
+instance Dump AnyInterface IfInetAddress
+instance Dump AnyInterface IfInet6Address
 
 -- | The index of a layer-3 interface.
 newtype IfIndex = IfIndex {ifIndex :: Int}
-    deriving (Show, Eq, Num, Ord)
+    deriving (Show, Eq, Num, Ord, Real, Enum, Integral)
 instance Message IfIndex where
     type MessageHeader IfIndex = IfAddrMsg
     messageHeader (IfIndex ix) = IfAddrMsg 0 0 0 0 (fromIntegral ix)
@@ -130,7 +138,7 @@ instance Reply IfIndex where
 
 -- | A netmask in CIDR notation.
 newtype IfPrefix = IfPrefix {ifPrefix :: Word8}
-    deriving (Show, Eq, Num, Ord)
+    deriving (Show, Eq, Num, Ord, Real, Enum, Integral)
 instance Message IfPrefix where
     type MessageHeader IfPrefix = IfAddrMsg
     messageHeader (IfPrefix p)  = IfAddrMsg 0 p 0 0 0

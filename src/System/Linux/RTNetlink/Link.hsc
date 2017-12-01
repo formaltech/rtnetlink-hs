@@ -34,7 +34,7 @@ import System.Linux.RTNetlink.Message
 
 -- | A link identified by its index.
 newtype LinkIndex = LinkIndex Int
-    deriving (Show, Eq, Num, Ord)
+    deriving (Show, Eq, Num, Ord, Enum, Real, Integral)
 instance Message LinkIndex where
     type MessageHeader LinkIndex = IfInfoMsg
     messageHeader (LinkIndex ix) = IfInfoMsg (fromIntegral ix) 0 0
@@ -46,10 +46,14 @@ instance Reply LinkIndex where
     type ReplyHeader LinkIndex = IfInfoMsg
     replyTypeNumbers = const [#{const RTM_NEWLINK}]
     fromNLMessage    = Just . LinkIndex . fromIntegral . ifIndex . nlmHeader
+instance Dump LinkIndex LinkIndex
+instance Dump LinkIndex LinkName
+instance Dump LinkIndex LinkEther
+instance Dump LinkIndex LinkState
 
 -- | A link identified by its name.
 newtype LinkName = LinkName S.ByteString
-    deriving (Show, Eq)
+    deriving (Show, Eq, IsString)
 instance Message LinkName where
     type MessageHeader LinkName = IfInfoMsg
     messageAttrs  (LinkName bs) = AttributeList
