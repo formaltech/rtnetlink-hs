@@ -14,13 +14,13 @@ import System.Linux.RTNetlink.Link
 import System.Linux.RTNetlink.Address
 
 loopback :: LinkName
-loopback = LinkName "lo"
+loopback = "lo"
 
 testLink :: LinkName
-testLink = LinkName "foobazblargle"
+testLink = "foobazblargle"
 
 notALink :: LinkName
-notALink = LinkName "notalink"
+notALink = "notalink"
 
 localhost4 :: InetAddress
 localhost4 = inetAddressFromTuple (127,0,0,1)
@@ -38,8 +38,8 @@ createTestInterface :: IO ()
 createTestInterface = runRTNL $ do
     create $ Bridge testLink
     [LinkIndex n] <- dump testLink
-    let prefix4 = IfPrefix 24
-        prefix6 = IfPrefix 64
+    let prefix4 = 24
+        prefix6 = 64
         index   = IfIndex n
     create $ IfInetAddress testAddress4 prefix4 index
     create $ IfInet6Address testAddress6 prefix6 index
@@ -122,7 +122,7 @@ testCreate = do
         it "creates ipv4 addresses" $ do
             addresses <- runRTNL $ do
                 [LinkIndex n] <- dump testLink
-                let prefix    = IfPrefix 24
+                let prefix    = 24
                     index     = IfIndex n
                     interface = IfInetAddress testAddress4 prefix index
                 create interface
@@ -132,7 +132,7 @@ testCreate = do
         it "creates ipv6 addresses" $ do
             addresses <- runRTNL $ do
                 [LinkIndex n] <- dump testLink
-                let prefix    = IfPrefix 64
+                let prefix    = 64
                     index     = IfIndex n
                     interface = IfInet6Address testAddress6 prefix index
                 create interface
@@ -144,7 +144,7 @@ testCreate = do
                 indices <- runRTNL $ dump AnyLink
                 let LinkIndex n = maximum indices + 1
                     badIx       = IfIndex n
-                    prefix      = IfPrefix 24
+                    prefix      = 24
                     interface   = IfInetAddress testAddress4 prefix badIx
                 runRTNL (create interface) `shouldThrow` anyIOException
 
@@ -152,7 +152,7 @@ testCreate = do
             it "throws an exception" $ do
                 [LinkIndex n] <- runRTNL $ dump testLink
                 let index     = IfIndex n
-                    badPrefix = IfPrefix 42
+                    badPrefix = 42
                     interface = IfInetAddress testAddress4 badPrefix index
                 runRTNL (create interface) `shouldThrow` anyIOException
 
@@ -200,7 +200,7 @@ testDestroy = do
         it "destroys ipv4 addresses" $ do
             addresses <- runRTNL $ do
                 [LinkIndex n] <- dump testLink
-                let prefix    = IfPrefix 24
+                let prefix    = 24
                     index     = IfIndex n
                     interface = IfInetAddress testAddress4 prefix index
                 destroy interface
@@ -210,7 +210,7 @@ testDestroy = do
         it "destroys ipv6 addresses" $ do
             addresses <- runRTNL $ do
                 [LinkIndex n] <- dump testLink
-                let prefix    = IfPrefix 64
+                let prefix    = 64
                     index     = IfIndex n
                     interface = IfInet6Address testAddress6 prefix index
                 destroy interface
