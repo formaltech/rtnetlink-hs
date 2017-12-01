@@ -118,8 +118,6 @@ instance Message AnyInterface where
 instance Request AnyInterface where
     requestTypeNumber = const #{const RTM_GETADDR}
     requestNLFlags    = const dumpNLFlags
-instance Dump AnyInterface ()
-instance Dump AnyInterface C.Errno
 instance Dump AnyInterface InetAddress
 instance Dump AnyInterface Inet6Address
 instance Dump AnyInterface IfIndex
