@@ -1,5 +1,5 @@
 # We need sudo, so no caching :_(
-sudo: false
+sudo: true
 
 # Do not choose a language; we provide our own build tools.
 language: generic
