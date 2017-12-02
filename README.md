@@ -1,6 +1,6 @@
 # RTNetlink
 
-RTNetlink is an extensible, high-level, pure Haskell interface for manipulating
+RTNetlink is an extensible, high-level, pure-Haskell interface for manipulating
 network interfaces on Linux: creating and destroying interfaces, changing and
 dumping interface settings, adding and removing addresses.
 
