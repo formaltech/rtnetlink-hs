@@ -128,7 +128,7 @@ instance Create Dummy where
 
 -- | A bridge interface.
 newtype Bridge = Bridge LinkName
-    deriving (Show, Eq)
+    deriving (Show, Eq, IsString)
 instance Message Bridge where
     type MessageHeader Bridge = IfInfoMsg
     messageAttrs  (Bridge name) = messageAttrs name <> AttributeList
