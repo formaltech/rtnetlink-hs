@@ -40,7 +40,7 @@ newtype LinkIndex = LinkIndex Int
     deriving (Show, Eq, Num, Ord, Enum, Real, Integral)
 instance Message LinkIndex where
     type MessageHeader LinkIndex = IfInfoMsg
-    messageHeader (LinkIndex ix) = IfInfoMsg (fromIntegral ix) 0 0
+    messageHeader (LinkIndex ix) = IfInfoMsg (fromIntegral ix) 0
 instance Destroy LinkIndex where
     destroyTypeNumber = const #{const RTM_DELLINK}
 instance Request LinkIndex where
@@ -149,14 +149,14 @@ instance Reply LinkState where
 instance Change LinkName LinkState where
     changeTypeNumber _ _ = #{const RTM_SETLINK}
     changeAttrs      n _ = messageAttrs n
-    changeHeader     n s = IfInfoMsg ix flag #{const IFF_UP}
+    changeHeader     n s = IfInfoMsg ix flag
         where
         ix   = ifIndex $ messageHeader n
         flag = if s == Up then #{const IFF_UP} else 0
 instance Change LinkIndex LinkState where
     changeTypeNumber _ _ = #{const RTM_SETLINK}
     changeAttrs      n _ = messageAttrs n
-    changeHeader     n s = IfInfoMsg ix flag #{const IFF_UP}
+    changeHeader     n s = IfInfoMsg ix flag
         where
         ix   = ifIndex $ messageHeader n
         flag = if s == Up then #{const IFF_UP} else 0
@@ -166,7 +166,6 @@ instance Change LinkIndex LinkState where
 data IfInfoMsg = IfInfoMsg
     { ifIndex  :: Int32  -- ^ The index of the link.
     , ifFlags  :: Word32 -- ^ Operational flags of the link.
-    , ifChange :: Word32 -- ^ Change mask for link flags.
     } deriving (Show, Eq)
 instance Sized IfInfoMsg where
     size = const #{const sizeof(struct ifinfomsg)}
@@ -177,12 +176,12 @@ instance Serialize IfInfoMsg where
         putWord16host 0
         putInt32host  ifIndex
         putWord32host ifFlags
-        putWord32host ifChange
+        putWord32host 0xffffffff
     get = do
         skip 4
-        ifIndex  <- getInt32le
-        ifFlags  <- getWord32host
-        ifChange <- getWord32host
+        ifIndex <- getInt32le
+        ifFlags <- getWord32host
+        _change <- getWord32host
         return $ IfInfoMsg {..}
 instance Header IfInfoMsg where
-    emptyHeader = IfInfoMsg 0 0 0
+    emptyHeader = IfInfoMsg 0 0
