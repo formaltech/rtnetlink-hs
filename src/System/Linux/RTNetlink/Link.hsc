@@ -161,8 +161,8 @@ instance Change LinkIndex LinkState where
         ix   = ifIndex $ messageHeader n
         flag = if s == Up then #{const IFF_UP} else 0
 
--- | The header corresponding to link messages, based on 'struct ifinfomsg'
--- from 'linux/if_link.h'.
+-- | The header corresponding to link messages, based on @struct ifinfomsg@
+-- from @linux/if_link.h@.
 data IfInfoMsg = IfInfoMsg
     { ifIndex  :: Int32  -- ^ The index of the link.
     , ifFlags  :: Word32 -- ^ Operational flags of the link.
