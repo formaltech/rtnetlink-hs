@@ -74,29 +74,30 @@ instance Reply LinkName where
     type ReplyHeader LinkName = IfInfoMsg
     replyTypeNumbers = const [#{const RTM_NEWLINK}]
     fromNLMessage m  = do
-        a <- findAttribute [#{const IFLA_IFNAME}] . nlmAttrs $ m
+        a <- findAttribute [#{const IFLA_IFNAME}] $ nlmAttrs m
         n <- S.takeWhile (/=0) <$> attributeData a
         return $ LinkName n
-instance Dump LinkName LinkIndex
+instance Dump LinkIndex LinkName
 instance Dump LinkName LinkName
-instance Dump LinkName LinkEther
-instance Dump LinkName LinkState
+instance Dump AnyLink LinkName
 
 -- | An ethernet address.
 data LinkEther = LinkEther Word8 Word8 Word8 Word8 Word8 Word8
     deriving Eq
 instance Show LinkEther where
-    show (LinkEther a b c d e f) = hex a <:> hex b <:> hex c <:> hex d <:> hex e <:> hex f
-        where
-        hex w   = hexdig (w `div` 0x10) : hexdig (w `rem` 0x10) : []
-        hexdig  = (!!) "0123456789abcdef" . fromIntegral
-        s <:> t = s ++ ":" ++ t :: String
+    show (LinkEther a b c d e f) = showMac a b c d e f
 instance Serialize LinkEther where
-    put (LinkEther a b c d e f) = put a >> put b >> put c >> put d >> put e >> put f
+    put (LinkEther a b c d e f) = mapM_ put [a,b,c,d,e,f]
     get = LinkEther <$> get <*> get <*> get <*> get <*> get <*> get
 instance Message LinkEther where
     type MessageHeader LinkEther = IfInfoMsg
-    messageAttrs  e = AttributeList [Attribute #{const IFLA_ADDRESS} $ encode e]
+    messageAttrs e  = AttributeList [Attribute #{const IFLA_ADDRESS} $ encode e]
+instance Change LinkName LinkEther where
+    changeTypeNumber _ _ = #{const RTM_SETLINK}
+    changeAttrs      n m = messageAttrs n <> messageAttrs m
+instance Change LinkIndex LinkEther where
+    changeTypeNumber _ _ = #{const RTM_SETLINK}
+    changeAttrs      n m = messageAttrs n <> messageAttrs m
 instance Reply LinkEther where
     type ReplyHeader LinkEther = IfInfoMsg
     replyTypeNumbers = const [#{const RTM_NEWLINK}]
