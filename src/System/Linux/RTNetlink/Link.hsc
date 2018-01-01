@@ -24,13 +24,15 @@ import Data.Int (Int32)
 import Data.Monoid ((<>))
 import Data.Serialize
 import Data.String (IsString)
-import Data.Word (Word8, Word32)
+import Data.Word (Word8, Word16, Word32)
 import qualified Data.ByteString as S
 import qualified Foreign.C.Error as C
 
-import System.Linux.RTNetlink.Packet
 import System.Linux.RTNetlink.Message
+import System.Linux.RTNetlink.Packet
+import System.Linux.RTNetlink.Util
 
+#include <linux/if_ether.h>
 #include <linux/if_link.h>
 #include <linux/rtnetlink.h>
 #include <net/if.h>
