@@ -28,6 +28,8 @@ module System.Linux.RTNetlink.Packet (
     , cStringAttr
     , word32Attr
     , word16Attr
+    , word32AttrBE
+    , word16AttrBE
     -- * Sized data
     , Sized(..)
     , putAligned
@@ -35,7 +37,6 @@ module System.Linux.RTNetlink.Packet (
 
 import Control.Applicative ((<$>), (<*>))
 import Control.Monad (guard)
-import Control.Monad.Loops (unfoldM)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe (runMaybeT)
 import Data.Bits ((.|.), (.&.), xor)
@@ -45,6 +46,8 @@ import Data.Monoid (Monoid, mempty, mappend)
 import Data.Serialize
 import Data.Word (Word16,Word32)
 import qualified Data.ByteString as S
+
+import System.Linux.RTNetlink.Util
 
 #include <linux/netlink.h>
 
@@ -167,13 +170,21 @@ instance Monoid AttributeList where
 cStringAttr :: AttributeType -> S.ByteString -> Attribute
 cStringAttr t bs = Attribute t $ bs `S.snoc` 0
 
--- | Construct an 'Attribute' with a 32-bit word as data.
+-- | Construct an 'Attribute' with a 32-bit word in host byte-order as data.
 word32Attr :: AttributeType -> Word32 -> Attribute
 word32Attr t = Attribute t . runPut . putWord32host
 
--- | Construct an 'Attribute' with a 16-bit word as data.
+-- | Construct an 'Attribute' with a 16-bit word in host byte-order as data.
 word16Attr :: AttributeType -> Word16 -> Attribute
 word16Attr t = Attribute t . runPut . putWord16host
+
+-- | Construct an 'Attribute' with a 32-bit word in network byte-order as data.
+word32AttrBE :: AttributeType -> Word32 -> Attribute
+word32AttrBE t = Attribute t . runPut . putWord32be
+
+-- | Construct an 'Attribute' with a 16-bit word in network byte-order as data.
+word16AttrBE :: AttributeType -> Word16 -> Attribute
+word16AttrBE t = Attribute t . runPut . putWord16be
 
 -- | Get the type of an 'Attribute'.
 attributeType :: Attribute -> AttributeType

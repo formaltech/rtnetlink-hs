@@ -138,18 +138,20 @@ class Message id => Change id c where
     -- | The top-level type number associated with changing things with this
     -- message.
     changeTypeNumber :: id -> c -> TypeNumber
-    -- | Construct a header from an identifier and a quality. Should probably
-    -- use the identifying message's 'messageHeader'.
+    -- | Construct a header from an identifier and a quality. By default, use
+    -- the identifying message's 'messageHeader'.
     changeHeader     :: id -> c -> MessageHeader id
-    -- | Construct aattributes from an identifier and a quality. Should
-    -- probably use the identifying message's 'messageAttrs'.
+    changeHeader i _ = messageHeader i
+    -- | Construct aattributes from an identifier and a quality. By default,
+    -- use the identifying message's 'messageAttrs'.
     changeAttrs      :: id -> c -> AttributeList
+    changeAttrs i _ = messageAttrs i
     -- | Produce an NLMessage suitable for sending over the wire.
     changeNLMessage  :: id -> c -> SequenceNumber -> NLMessage (MessageHeader id)
     changeNLMessage i c = 
         NLMessage (changeHeader i c) (changeAttrs i c) (changeTypeNumber i c) flags
         where flags  = #{const NLM_F_REQUEST | NLM_F_ACK}
-    {-# MINIMAL changeTypeNumber, changeHeader, changeAttrs #-}
+    {-# MINIMAL changeTypeNumber #-}
 
 -- | Class of 'Message's that can serve as requests.
 class Message r => Request r where

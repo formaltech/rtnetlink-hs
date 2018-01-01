@@ -52,9 +52,8 @@ instance Reply LinkIndex where
     replyTypeNumbers = const [#{const RTM_NEWLINK}]
     fromNLMessage    = Just . LinkIndex . fromIntegral . ifIndex . nlmHeader
 instance Dump LinkIndex LinkIndex
-instance Dump LinkIndex LinkName
-instance Dump LinkIndex LinkEther
-instance Dump LinkIndex LinkState
+instance Dump LinkName LinkIndex
+instance Dump AnyLink LinkIndex
 
 -- | A link identified by its name.
 newtype LinkName = LinkName S.ByteString
@@ -105,6 +104,31 @@ instance Reply LinkEther where
         a <- findAttribute [#{const IFLA_ADDRESS}] . nlmAttrs $ m
         d <- attributeData a
         decodeMaybe d
+instance Dump LinkIndex LinkEther
+instance Dump LinkName LinkEther
+instance Dump AnyLink LinkEther
+
+-- | An ethernet broadcast address.
+data LinkBroadcastEther = LinkBroadcastEther Word8 Word8 Word8 Word8 Word8 Word8
+    deriving Eq
+instance Show LinkBroadcastEther where
+    show (LinkBroadcastEther a b c d e f) = showMac a b c d e f
+instance Serialize LinkBroadcastEther where
+    put (LinkBroadcastEther a b c d e f) = mapM_ put [a,b,c,d,e,f]
+    get = LinkBroadcastEther <$> get <*> get <*> get <*> get <*> get <*> get
+instance Message LinkBroadcastEther where
+    type MessageHeader LinkBroadcastEther = IfInfoMsg
+    messageAttrs e  = AttributeList [Attribute #{const IFLA_BROADCAST} $ encode e]
+instance Reply LinkBroadcastEther where
+    type ReplyHeader LinkBroadcastEther = IfInfoMsg
+    replyTypeNumbers = const [#{const RTM_NEWLINK}]
+    fromNLMessage m  = do
+        a <- findAttribute [#{const IFLA_BROADCAST}] . nlmAttrs $ m
+        d <- attributeData a
+        decodeMaybe d
+instance Dump LinkIndex LinkBroadcastEther
+instance Dump LinkName LinkBroadcastEther
+instance Dump AnyLink LinkBroadcastEther
 
 -- | Link wildcard.
 data AnyLink = AnyLink
@@ -114,17 +138,12 @@ instance Message AnyLink where
 instance Request AnyLink where
     requestTypeNumber = const #{const RTM_GETLINK}
     requestNLFlags    = const dumpNLFlags
-instance Dump AnyLink LinkIndex
-instance Dump AnyLink LinkName
-instance Dump AnyLink LinkEther
-instance Dump AnyLink LinkState
 
 -- | A dummy interface.
 newtype Dummy = Dummy LinkName
     deriving (Show, Eq)
 instance Message Dummy where
     type MessageHeader Dummy = IfInfoMsg
-    messageHeader (Dummy name) = messageHeader name
     messageAttrs  (Dummy name) = messageAttrs name <> AttributeList
         [ AttributeNest #{const IFLA_LINKINFO}
             [ cStringAttr #{const IFLA_INFO_KIND} "dummy" ]
@@ -137,11 +156,33 @@ newtype Bridge = Bridge LinkName
     deriving (Show, Eq, IsString)
 instance Message Bridge where
     type MessageHeader Bridge = IfInfoMsg
-    messageAttrs  (Bridge name) = messageAttrs name <> AttributeList
+    messageAttrs (Bridge name) = messageAttrs name <> AttributeList
         [ AttributeNest #{const IFLA_LINKINFO}
             [ cStringAttr #{const IFLA_INFO_KIND} "bridge" ]
         ]
 instance Create Bridge where
+    createTypeNumber = const #{const RTM_NEWLINK}
+
+-- | An 802.1Q vlan interface.
+data Dot1QVlan = Dot1QVlan
+    LinkIndex -- ^ Index of parent interface
+    Word16    -- ^ Vlan ID number
+    LinkName  -- ^ Name of new vlan interface
+    deriving (Show, Eq)
+instance Message Dot1QVlan where
+    type MessageHeader Dot1QVlan = IfInfoMsg
+    messageAttrs (Dot1QVlan (LinkIndex n) vid name) =
+        messageAttrs name <> AttributeList
+            [ word32Attr #{const IFLA_LINK} (fromIntegral n)
+            , AttributeNest #{const IFLA_LINKINFO}
+                [ cStringAttr #{const IFLA_INFO_KIND} "vlan"
+                , AttributeNest #{const IFLA_INFO_DATA}
+                    [ word16Attr #{const IFLA_VLAN_ID} vid
+                    , word16AttrBE #{const IFLA_VLAN_PROTOCOL} #{const ETH_P_8021Q}
+                    ]
+                ]
+            ]
+instance Create Dot1QVlan where
     createTypeNumber = const #{const RTM_NEWLINK}
 
 -- | The state of a link.
@@ -154,18 +195,118 @@ instance Reply LinkState where
         where flag = ifFlags (nlmHeader m) .&. #{const IFF_UP}
 instance Change LinkName LinkState where
     changeTypeNumber _ _ = #{const RTM_SETLINK}
-    changeAttrs      n _ = messageAttrs n
     changeHeader     n s = IfInfoMsg ix flag
         where
         ix   = ifIndex $ messageHeader n
         flag = if s == Up then #{const IFF_UP} else 0
 instance Change LinkIndex LinkState where
     changeTypeNumber _ _ = #{const RTM_SETLINK}
-    changeAttrs      n _ = messageAttrs n
     changeHeader     n s = IfInfoMsg ix flag
         where
         ix   = ifIndex $ messageHeader n
         flag = if s == Up then #{const IFF_UP} else 0
+instance Dump LinkIndex LinkState
+instance Dump LinkName LinkState
+instance Dump AnyLink LinkState
+
+-- | A 'Promiscuous' link accepts all frames at layer 2; a 'Chaste' one accepts
+-- just those addressed to it and possibly ones sent to the broadcast address.
+data LinkPromiscuity = Promiscuous | Chaste
+    deriving (Show, Eq)
+instance Reply LinkPromiscuity where
+    type ReplyHeader LinkPromiscuity = IfInfoMsg
+    replyTypeNumbers = const [#{const RTM_NEWLINK}]
+    fromNLMessage m  = Just $ if flag == 0 then Chaste else Promiscuous
+        where flag = ifFlags (nlmHeader m) .&. #{const IFF_PROMISC}
+instance Change LinkName LinkPromiscuity where
+    changeTypeNumber _ _ = #{const RTM_SETLINK}
+    changeHeader     n s = IfInfoMsg ix flag
+        where
+        ix   = ifIndex $ messageHeader n
+        flag = if s == Promiscuous then #{const IFF_PROMISC} else 0
+instance Change LinkIndex LinkPromiscuity where
+    changeTypeNumber _ _ = #{const RTM_SETLINK}
+    changeHeader     n s = IfInfoMsg ix flag
+        where
+        ix   = ifIndex $ messageHeader n
+        flag = if s == Promiscuous then #{const IFF_PROMISC} else 0
+instance Dump LinkIndex LinkPromiscuity
+instance Dump LinkName LinkPromiscuity
+instance Dump AnyLink LinkPromiscuity
+
+-- | Whether to use ARP on the interface to resolve L3 addresses to L2 ones.
+data LinkArp = Arp | NoArp
+    deriving (Show, Eq)
+instance Reply LinkArp where
+    type ReplyHeader LinkArp = IfInfoMsg
+    replyTypeNumbers = const [#{const RTM_NEWLINK}]
+    fromNLMessage m  = Just $ if flag == 0 then Arp else NoArp
+        where flag = ifFlags (nlmHeader m) .&. #{const IFF_NOARP}
+instance Change LinkName LinkArp where
+    changeTypeNumber _ _ = #{const RTM_SETLINK}
+    changeHeader     n s = IfInfoMsg ix flag
+        where
+        ix   = ifIndex $ messageHeader n
+        flag = if s == NoArp then #{const IFF_NOARP} else 0
+instance Change LinkIndex LinkArp where
+    changeTypeNumber _ _ = #{const RTM_SETLINK}
+    changeHeader     n s = IfInfoMsg ix flag
+        where
+        ix   = ifIndex $ messageHeader n
+        flag = if s == NoArp then #{const IFF_NOARP} else 0
+instance Dump LinkIndex LinkArp
+instance Dump LinkName LinkArp
+instance Dump AnyLink LinkArp
+
+-- | Internal debug flag. If this is supported by the driver, it will generally
+-- spew some extra information into @dmesg@.
+data LinkDebug = Debug | NoDebug
+    deriving (Show, Eq)
+instance Reply LinkDebug where
+    type ReplyHeader LinkDebug = IfInfoMsg
+    replyTypeNumbers = const [#{const RTM_NEWLINK}]
+    fromNLMessage m  = Just $ if flag == 0 then NoDebug else Debug
+        where flag = ifFlags (nlmHeader m) .&. #{const IFF_DEBUG}
+instance Change LinkName LinkDebug where
+    changeTypeNumber _ _ = #{const RTM_SETLINK}
+    changeHeader     n s = IfInfoMsg ix flag
+        where
+        ix   = ifIndex $ messageHeader n
+        flag = if s == Debug then #{const IFF_DEBUG} else 0
+instance Change LinkIndex LinkDebug where
+    changeTypeNumber _ _ = #{const RTM_SETLINK}
+    changeHeader     n s = IfInfoMsg ix flag
+        where
+        ix   = ifIndex $ messageHeader n
+        flag = if s == Debug then #{const IFF_DEBUG} else 0
+instance Dump LinkIndex LinkDebug
+instance Dump LinkName LinkDebug
+instance Dump AnyLink LinkDebug
+
+-- | Maximum transmission unit for a link. Note that some interface types, such
+-- as 'Bridge's, don't allow this to be changed.
+newtype LinkMTU = LinkMTU Word32
+    deriving (Show, Eq, Num, Ord, Enum, Real, Integral)
+instance Message LinkMTU where
+    type MessageHeader LinkMTU = IfInfoMsg
+    messageAttrs (LinkMTU mtu) =
+        AttributeList [word32Attr #{const IFLA_MTU} mtu]
+instance Change LinkName LinkMTU where
+    changeTypeNumber _ _ = #{const RTM_SETLINK}
+    changeAttrs      n m = messageAttrs n <> messageAttrs m
+instance Change LinkIndex LinkMTU where
+    changeTypeNumber _ _ = #{const RTM_SETLINK}
+    changeAttrs      n m = messageAttrs n <> messageAttrs m
+instance Reply LinkMTU where
+    type ReplyHeader LinkMTU = IfInfoMsg
+    replyTypeNumbers = const [#{const RTM_NEWLINK}]
+    fromNLMessage m  = do
+        a <- findAttribute [#{const IFLA_MTU}] $ nlmAttrs m
+        d <- attributeData a
+        LinkMTU <$> runGetMaybe getWord32host d
+instance Dump LinkIndex LinkMTU
+instance Dump LinkName LinkMTU
+instance Dump AnyLink LinkMTU
 
 -- | The header corresponding to link messages, based on @struct ifinfomsg@
 -- from @linux/if_link.h@.
