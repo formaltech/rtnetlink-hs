@@ -36,7 +36,7 @@ testAddress6 = inet6AddressFromTuple (0xfe80,42,42,42,42,42,42,42)
 
 createTestInterface :: IO ()
 createTestInterface = runRTNL $ do
-    create $ Bridge testLink
+    create $ Dummy testLink
     [LinkIndex n] <- dump testLink
     let prefix4 = 24
         prefix6 = 64
@@ -48,7 +48,7 @@ withTestInterface :: IO a -> IO a
 withTestInterface = bracket createTestInterface (const destroyTestLink) . const
 
 createTestLink :: IO ()
-createTestLink = runRTNL (create $ Bridge testLink)
+createTestLink = runRTNL (create $ Dummy testLink)
 
 destroyTestLink :: IO ()
 destroyTestLink = runRTNL $ destroy testLink
@@ -84,17 +84,32 @@ testDump = do
         it "gets link indices" $ do
             runRTNL (dump loopback) `shouldReturn` [LinkIndex 1]
 
+        it "gets link ethernet addresses" $ do
+            runRTNL (dump loopback) `shouldReturn` [LinkEther 0 0 0 0 0 0]
+
+        it "gets link broadcast ethernet addresses" $ do
+            runRTNL (dump loopback) `shouldReturn` [LinkBroadcastEther 0 0 0 0 0 0]
+
         it "gets link states" $ do
             runRTNL (dump loopback) `shouldReturn` [Up]
+
+        it "gets link promiscuity" $ do
+            runRTNL (dump loopback) `shouldReturn` [Chaste]
+
+        it "gets link arp state" $ do
+            runRTNL (dump loopback) `shouldReturn` [Arp]
+
+        it "gets link debug state" $ do
+            runRTNL (dump loopback) `shouldReturn` [NoDebug]
+
+        it "gets link MTUs" $ do
+            runRTNL (dump loopback) `shouldReturn` [LinkMTU 0x10000]
 
         context "when given a non-existent link name" $ do
             it "throws an exception" $ do
                 runRTNL (dump notALink :: RTNL [()]) `shouldThrow` anyIOException
 
     context "when operating on layer-3 interfaces" $ do
-        it "gets link ethernet addresses" $ do
-            runRTNL (dump loopback) `shouldReturn` [LinkEther 0 0 0 0 0 0]
-
         it "gets interface ipv4 addresses" $ do
             addresses <- runRTNL $ dump AnyInterface
             addresses `shouldSatisfy` elem localhost4
@@ -117,6 +132,15 @@ testCreate = do
                 create $ Dummy testLink
                 dump AnyLink
             links `shouldSatisfy` elem testLink
+
+        it "creates vlan links" $ do
+            let testVlan = LinkName "zipzapvlan"
+            links <- runRTNL $ do
+                create $ Dummy testLink
+                ix:_ <- dump testLink
+                create $ Dot1QVlan ix 101 testVlan
+                dump AnyLink
+            links `shouldSatisfy` elem testVlan
 
     context "when operating on layer-3 interfaces" $ around_ withTestLink $ do
         it "creates ipv4 addresses" $ do
@@ -171,6 +195,59 @@ testChange = do
                 change testLink Down
                 dump testLink
             state `shouldBe` Down
+
+        it "makes links promiscuous" $ do
+            [state] <- runRTNL $ do
+                change testLink Promiscuous
+                dump testLink
+            state `shouldBe` Promiscuous
+
+        it "makes links chaste" $ do
+            [state] <- runRTNL $ do
+                change testLink Promiscuous
+                change testLink Chaste
+                dump testLink
+            state `shouldBe` Chaste
+
+        it "turns off arp on links" $ do
+            [state] <- runRTNL $ do
+                change testLink NoArp
+                dump testLink
+            state `shouldBe` NoArp
+
+        it "turns on arp on links" $ do
+            [state] <- runRTNL $ do
+                change testLink NoArp
+                change testLink Arp
+                dump testLink
+            state `shouldBe` Arp
+
+        it "turns off debug on links" $ do
+            [state] <- runRTNL $ do
+                change testLink Debug
+                dump testLink
+            state `shouldBe` Debug
+
+        it "turns on arp on links" $ do
+            [state] <- runRTNL $ do
+                change testLink Debug
+                change testLink NoDebug
+                dump testLink
+            state `shouldBe` NoDebug
+
+        it "changes link MTUs" $ do
+            let weirdMTU = LinkMTU 9999
+            [mtu] <- runRTNL $ do
+                change testLink weirdMTU
+                dump testLink
+            mtu `shouldBe` weirdMTU
+
+        it "changes link ethernet addresses" $ do
+            let weirdEther = LinkEther 0xaa 0xbb 0xcc 0xdd 0xee 0xff
+            [eth] <- runRTNL $ do
+                change testLink weirdMAC
+                dump testLink
+            eth `shouldBe` weirdEther
 
         context "when given a non-existent link name" $ do
             it "throws an exception" $ do
