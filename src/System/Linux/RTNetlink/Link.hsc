@@ -63,6 +63,9 @@ instance Message LinkName where
     type MessageHeader LinkName = IfInfoMsg
     messageAttrs  (LinkName bs) = AttributeList
         [cStringAttr #{const IFLA_IFNAME} $ S.take #{const IFNAMSIZ} bs]
+instance Change LinkIndex LinkName where
+    changeTypeNumber _ _ = #{const RTM_SETLINK}
+    changeAttrs      n m = messageAttrs n <> messageAttrs m
 instance Destroy LinkName where
     destroyTypeNumber = const #{const RTM_DELLINK}
 instance Request LinkName where
