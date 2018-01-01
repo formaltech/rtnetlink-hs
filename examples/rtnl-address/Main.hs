@@ -22,24 +22,29 @@ main :: IO ()
 main = do
     args <- getArgs
     err  <- tryRTNL $ case args of
+
+        "dump":"ipv4":[] -> do
+            addresses <- dump AnyInterface
+            liftIO $ mapM_ (putStrLn . show) (addresses::[IfInetAddress])
+
+        "dump":"ipv6":[] -> do
+            addresses <- dump AnyInterface
+            liftIO $ mapM_ (putStrLn . show) (addresses::[IfInet6Address])
+
         "create":"ipv4":ipv4:"index":ix':[] -> do
             let ix          = IfIndex $ read ix'
                 [a,b,c,d,m] = fmap read . splitOneOf "./" $ ipv4
                 address     = inetAddressFromTuple (a,b,c,d)
                 prefix      = IfPrefix m
             create $ IfInetAddress address prefix ix
+
         "destroy":"ipv4":ipv4:"index":ix':[] -> do
             let ix          = IfIndex $ read ix'
                 [a,b,c,d,m] = fmap read . splitOneOf "./" $ ipv4
                 address     = inetAddressFromTuple (a,b,c,d)
                 prefix      = IfPrefix m
             destroy $ IfInetAddress address prefix ix
-        "dump":"ipv4":[] -> do
-            addresses <- dump AnyInterface
-            liftIO $ mapM_ (putStrLn . show) (addresses::[IfInetAddress])
-        "dump":"ipv6":[] -> do
-            addresses <- dump AnyInterface
-            liftIO $ mapM_ (putStrLn . show) (addresses::[IfInet6Address])
+
         _ -> liftIO usage
     case err of
         Left  s  -> putStrLn $ "Error: " ++ s

@@ -42,6 +42,7 @@ executable rtnl-link
         build-depends:
             base        >=4.7  && <4.10,
             bytestring  >=0.10 && <0.11,
+            split       >=0.2  && <0.3,
             rtnetlink
     else
         buildable:      False
