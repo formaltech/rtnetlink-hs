@@ -1,8 +1,10 @@
 module Main where
 
-import Data.List.Split (splitOneOf)
+import Data.List (break)
+import Data.List.Split (splitOneOf, splitOn)
 import System.Environment
 import System.Socket.Family.Inet (inetAddressFromTuple)
+import System.Socket.Family.Inet6 (Inet6Address, inet6AddressFromTuple)
 
 import System.Linux.RTNetlink
 import System.Linux.RTNetlink.Address
@@ -13,10 +15,16 @@ usage = do
     putStrLn $ "Usage: " ++ prog ++ " COMMAND\n"
             ++ "\n"
             ++ "COMMAND\n"
-            ++ "\t= create ipv4 <ipv4>/<mask> index <ifindex>\n"
+            ++ "\t= dump DUMP\n"
+            ++ "\t| create ipv4 <ipv4>/<mask> index <ifindex>\n"
             ++ "\t| destroy ipv4 <ipv4>/<mask> index <ifindex>\n"
-            ++ "\t| dump ipv4\n"
-            ++ "\t| dump ipv6\n"
+            ++ "\n"
+            ++ "DUMP\n"
+            ++ "\t= ipv4 | ipv6\n"
+            ++ "\n"
+            ++ "ADDRESS\n"
+            ++ "\t= ipv4 <ipv4>/<mask>\n"
+            ++ "\t| ipv6 <u16>:<u16>:<u16>:<u16>:<u16>:<u16>:<u16>:<u16>/<mask>\n"
 
 main :: IO ()
 main = do
@@ -33,17 +41,33 @@ main = do
 
         "create":"ipv4":ipv4:"index":ix':[] -> do
             let ix          = IfIndex $ read ix'
-                [a,b,c,d,m] = fmap read . splitOneOf "./" $ ipv4
+                [a,b,c,d,m] = read <$> splitOneOf "./" ipv4
                 address     = inetAddressFromTuple (a,b,c,d)
                 prefix      = IfPrefix m
             create $ IfInetAddress address prefix ix
 
+        "create":"ipv6":ipv6':"index":ix':[] -> do
+            let ix                = IfIndex $ read ix'
+                (ipv6,'/':m)      = break (=='/') ipv6'
+                [a,b,c,d,e,f,g,h] = read . ("0x"++) <$> splitOn ":" ipv6
+                address           = inet6AddressFromTuple (a,b,c,d,e,f,g,h)
+                prefix            = IfPrefix $ read m
+            create $ IfInet6Address address prefix ix
+
         "destroy":"ipv4":ipv4:"index":ix':[] -> do
             let ix          = IfIndex $ read ix'
-                [a,b,c,d,m] = fmap read . splitOneOf "./" $ ipv4
+                [a,b,c,d,m] = read <$> splitOneOf ":/" ipv4
                 address     = inetAddressFromTuple (a,b,c,d)
                 prefix      = IfPrefix m
             destroy $ IfInetAddress address prefix ix
+
+        "destroy":"ipv6":ipv6':"index":ix':[] -> do
+            let ix                = IfIndex $ read ix'
+                (ipv6,'/':m)      = break (=='/') ipv6'
+                [a,b,c,d,e,f,g,h] = read . ("0x"++) <$> splitOn ":" ipv6
+                address           = inet6AddressFromTuple (a,b,c,d,e,f,g,h)
+                prefix            = IfPrefix $ read m
+            destroy $ IfInet6Address address prefix ix
 
         _ -> liftIO usage
     case err of

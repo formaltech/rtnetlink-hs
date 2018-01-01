@@ -208,11 +208,6 @@ main = do
                 eth           = LinkEther a b c d e f
             change ix eth
 
-        "change":"name":oldname':"name":newname':[] -> do
-            let oldname = LinkName $ S.pack oldname'
-                newname = LinkName $ S.pack newname'
-            change oldname newname
-
         "change":"index":ix':"name":name':[] -> do
             let ix   = LinkIndex $ read ix'
                 name = LinkName $ S.pack name'
