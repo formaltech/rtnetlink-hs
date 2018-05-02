@@ -60,6 +60,18 @@ executable rtnl-address
     main-is:            examples/rtnl-address/Main.hs
     default-language:   Haskell2010
 
+executable rtnl-route
+    if flag(examples)
+        build-depends:
+            base        >=4.7  && <4.11,
+            socket      >=0.8  && <0.9,
+            split       >=0.2  && <0.3,
+            rtnetlink
+    else
+        buildable:      False
+    main-is:            examples/rtnl-route/Main.hs
+    default-language:   Haskell2010
+
 library
     exposed-modules:
         System.Linux.RTNetlink,
@@ -67,6 +79,8 @@ library
         System.Linux.RTNetlink.Link,
         System.Linux.RTNetlink.Message,
         System.Linux.RTNetlink.Packet,
+        System.Linux.RTNetlink.Route,
+        System.Linux.RTNetlink.Scope,
         System.Socket.Family.Netlink,
         System.Socket.Protocol.RTNetlink
     other-extensions:

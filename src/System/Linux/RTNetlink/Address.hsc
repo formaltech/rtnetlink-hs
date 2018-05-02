@@ -24,6 +24,11 @@ module System.Linux.RTNetlink.Address
     -- * Re-exports
     , InetAddress
     , Inet6Address
+    -- Used by Route
+    , getInetAddress
+    , getInet6Address
+    , putInetAddress
+    , putInet6Address
     ) where
 
 import Control.Applicative ((<$>), (<*>))

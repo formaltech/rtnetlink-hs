@@ -201,6 +201,9 @@ fromNLMessage' m = do
     guard $ nlmType m `elem` replyTypeNumbers r
     return r
 
+maybeFromNLMessage :: Reply r => NLMessage (ReplyHeader r) -> Maybe (Maybe r)
+maybeFromNLMessage = maybe (Just Nothing) (Just . Just) . fromNLMessage
+
 -- Util
 
 decodeMaybe :: Serialize a => S.ByteString -> Maybe a
