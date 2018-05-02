@@ -19,6 +19,7 @@ module System.Linux.RTNetlink.Address
     , IfInet6Address(..)
     , IfIndex(..)
     , IfPrefix(..)
+    , IfScope(..)
     , AnyInterface(..)
     , IfAddrMsg(..)
     -- * Re-exports
@@ -45,6 +46,8 @@ import System.Socket.Family.Inet6 (inet6AddressFromTuple)
 
 import System.Linux.RTNetlink.Message
 import System.Linux.RTNetlink.Packet
+
+import System.Linux.RTNetlink.Scope
 
 #include <linux/if_addr.h>
 #include <linux/rtnetlink.h>
@@ -144,11 +147,24 @@ instance Reply IfPrefix where
     replyTypeNumbers _        = [#{const RTM_NEWADDR}]
     fromNLMessage             = Just . IfPrefix . addrPrefix . nlmHeader
 
+-- | Address scope
+newtype IfScope = IfScope Scope
+    deriving (Show, Eq)
+instance Message IfScope where
+    type MessageHeader IfScope = IfAddrMsg
+    messageHeader (IfScope s)  = IfAddrMsg 0 0 0 (fromIntegral $ fromRtScopeEnum $ fromScope s) 0
+instance Reply IfScope where
+    type ReplyHeader IfScope = IfAddrMsg
+    replyTypeNumbers _       = [#{const RTM_NEWROUTE}]
+    fromNLMessage            = Just . IfScope . toScope . fromIntegral . addrScope . nlmHeader
+
+
 -- | An ipv4 address and netmask associated with an interface.
 data IfInetAddress = IfInetAddress
-    { ifInetAddress :: InetAddress -- ^ The ip4v address itself.
+    { ifInetAddress :: InetAddress -- ^ The ipv4 address itself.
     , ifInetPrefix  :: IfPrefix    -- ^ The netmask in CIDR notation.
     , ifInetIfIndex :: IfIndex     -- ^ Index of the associated interface.
+    , ifInetScope   :: IfScope     -- ^ Address scope
     } deriving (Show, Eq)
 instance Message IfInetAddress where
     type MessageHeader IfInetAddress = IfAddrMsg
@@ -157,9 +173,11 @@ instance Message IfInetAddress where
         { addrFamily = #{const AF_INET}
         , addrPrefix = ifPrefix ifInetPrefix
         , addrFlags  = 0
-        , addrScope  = 0
+        , addrScope  = fromIntegral $ fromRtScopeEnum $ fromScope $ scope ifInetScope
         , addrIndex  = fromIntegral $ ifIndex ifInetIfIndex
         }
+      where
+        scope (IfScope x) = x
 instance Create IfInetAddress where
     createTypeNumber = const #{const RTM_NEWADDR}
 instance Destroy IfInetAddress where
@@ -168,13 +186,14 @@ instance Reply IfInetAddress where
     type ReplyHeader IfInetAddress = IfAddrMsg
     replyTypeNumbers _             = [#{const RTM_NEWADDR}]
     fromNLMessage    m             =
-        IfInetAddress <$> fromNLMessage m <*> fromNLMessage m <*> fromNLMessage m
+        IfInetAddress <$> fromNLMessage m <*> fromNLMessage m <*> fromNLMessage m <*> fromNLMessage m
 
 -- | An ipv6 address and netmask associated with an interface.
 data IfInet6Address = IfInet6Address
-    { ifInet6Address :: Inet6Address -- ^ The ip4v address itself.
+    { ifInet6Address :: Inet6Address -- ^ The ipv6 address itself.
     , ifInet6Prefix  :: IfPrefix     -- ^ The netmask in CIDR notation.
     , ifInet6IfIndex :: IfIndex      -- ^ Index of the associated interface.
+    , ifInet6Scope   :: IfScope      -- ^ Address scope
     } deriving (Show, Eq)
 instance Message IfInet6Address where
     type MessageHeader IfInet6Address = IfAddrMsg
@@ -183,9 +202,11 @@ instance Message IfInet6Address where
         { addrFamily = #{const AF_INET6}
         , addrPrefix = ifPrefix ifInet6Prefix
         , addrFlags  = 0
-        , addrScope  = 0
+        , addrScope  = fromIntegral $ fromRtScopeEnum $ fromScope $ scope ifInet6Scope
         , addrIndex  = fromIntegral $ ifIndex ifInet6IfIndex
         }
+      where
+        scope (IfScope x) = x
 instance Create IfInet6Address where
     createTypeNumber = const #{const RTM_NEWADDR}
 instance Destroy IfInet6Address where
@@ -194,7 +215,7 @@ instance Reply IfInet6Address where
     type ReplyHeader IfInet6Address = IfAddrMsg
     replyTypeNumbers _             = [#{const RTM_NEWADDR}]
     fromNLMessage    m             =
-        IfInet6Address <$> fromNLMessage m <*> fromNLMessage m <*> fromNLMessage m
+        IfInet6Address <$> fromNLMessage m <*> fromNLMessage m <*> fromNLMessage m <*> fromNLMessage m
 
 -- | The header corresponding to address messages, based on 'struct ifaddrmsg'
 -- from 'linux/if_addr.h'.
