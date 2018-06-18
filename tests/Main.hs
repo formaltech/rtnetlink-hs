@@ -12,6 +12,7 @@ import Test.Hspec
 import System.Linux.RTNetlink
 import System.Linux.RTNetlink.Link
 import System.Linux.RTNetlink.Address
+import System.Linux.RTNetlink.Scope
 
 loopback :: LinkName
 loopback = LinkName "lo"
@@ -41,8 +42,9 @@ createTestInterface = runRTNL $ do
     let prefix4 = IfPrefix 24
         prefix6 = IfPrefix 64
         index   = IfIndex n
-    create $ IfInetAddress testAddress4 prefix4 index
-    create $ IfInet6Address testAddress6 prefix6 index
+        scope   = IfScope ScopeLink
+    create $ IfInetAddress testAddress4 prefix4 index scope
+    create $ IfInet6Address testAddress6 prefix6 index scope
 
 withTestInterface :: IO a -> IO a
 withTestInterface = bracket createTestInterface (const destroyTestLink) . const
@@ -124,7 +126,8 @@ testCreate = do
                 [LinkIndex n] <- dump testLink
                 let prefix    = IfPrefix 24
                     index     = IfIndex n
-                    interface = IfInetAddress testAddress4 prefix index
+                    scope     = IfScope ScopeLink
+                    interface = IfInetAddress testAddress4 prefix index scope
                 create interface
                 dump AnyInterface
             addresses `shouldSatisfy` elem testAddress4
@@ -134,7 +137,8 @@ testCreate = do
                 [LinkIndex n] <- dump testLink
                 let prefix    = IfPrefix 64
                     index     = IfIndex n
-                    interface = IfInet6Address testAddress6 prefix index
+                    scope     = IfScope ScopeLink
+                    interface = IfInet6Address testAddress6 prefix index scope
                 create interface
                 dump AnyInterface
             addresses `shouldSatisfy` elem testAddress6
@@ -145,7 +149,8 @@ testCreate = do
                 let LinkIndex n = maximum indices + 1
                     badIx       = IfIndex n
                     prefix      = IfPrefix 24
-                    interface   = IfInetAddress testAddress4 prefix badIx
+                    scope       = IfScope ScopeLink
+                    interface   = IfInetAddress testAddress4 prefix badIx scope
                 runRTNL (create interface) `shouldThrow` anyIOException
 
         context "when given a silly prefix" $ do
@@ -153,7 +158,8 @@ testCreate = do
                 [LinkIndex n] <- runRTNL $ dump testLink
                 let index     = IfIndex n
                     badPrefix = IfPrefix 42
-                    interface = IfInetAddress testAddress4 badPrefix index
+                    scope     = IfScope ScopeLink
+                    interface = IfInetAddress testAddress4 badPrefix index scope
                 runRTNL (create interface) `shouldThrow` anyIOException
 
 testChange :: Spec
@@ -202,7 +208,8 @@ testDestroy = do
                 [LinkIndex n] <- dump testLink
                 let prefix    = IfPrefix 24
                     index     = IfIndex n
-                    interface = IfInetAddress testAddress4 prefix index
+                    scope     = IfScope ScopeLink
+                    interface = IfInetAddress testAddress4 prefix index scope
                 destroy interface
                 dump AnyInterface
             addresses `shouldSatisfy` not . elem testAddress4
@@ -212,7 +219,8 @@ testDestroy = do
                 [LinkIndex n] <- dump testLink
                 let prefix    = IfPrefix 64
                     index     = IfIndex n
-                    interface = IfInet6Address testAddress6 prefix index
+                    scope     = IfScope ScopeLink
+                    interface = IfInet6Address testAddress6 prefix index scope
                 destroy interface
                 dump AnyInterface
             addresses `shouldSatisfy` not . elem testAddress6
