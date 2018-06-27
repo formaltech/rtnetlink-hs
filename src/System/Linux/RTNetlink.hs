@@ -200,9 +200,8 @@ getResponses = do
     Handle h b v n <- RTNL get
     ps           <- liftIO $ receiveAll h 8192 mempty
     let ms       = concatMap splitMessages ps
-        (rs,ms') = partition ((==n) . sequenceNumber) ms
-    RTNL . put $ Handle h (b ++ ms') v n
-    return rs
+    RTNL . put $ Handle h (b) v n
+    return ms
 
 -- | Try to decode a 'Reply'. If that fails, send the original 'S.ByteString'
 -- back.
