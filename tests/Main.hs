@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Main where
 
 import Control.Exception (bracket)
@@ -14,6 +15,8 @@ import System.Linux.RTNetlink.Link
 import System.Linux.RTNetlink.Address
 import System.Linux.RTNetlink.Scope
 
+import System.Linux.Namespaces
+
 loopback :: LinkName
 loopback = LinkName "lo"
 
@@ -22,12 +25,6 @@ testLink = LinkName "foobazblargle"
 
 notALink :: LinkName
 notALink = LinkName "notalink"
-
-localhost4 :: InetAddress
-localhost4 = inetAddressFromTuple (127,0,0,1)
-
-localhost6 :: Inet6Address
-localhost6 = inet6AddressFromTuple (0,0,0,0,0,0,0,1)
 
 testAddress4 :: InetAddress
 testAddress4 = inetAddressFromTuple (169,254,42,42)
@@ -60,21 +57,14 @@ withTestLink = bracket createTestLink (const destroyTestLink) . const
 
 main :: IO ()
 main = do
-    haveRoot <- (0 ==) <$> getEffectiveUserID
+    uid <- getEffectiveUserID
+    unshare [User, Network]
+    writeUserMappings Nothing [UserMapping 0 uid 1]
     hspec $ do
-        describe "dump" testDump
-        describe "create" $
-            if haveRoot
-                then testCreate
-                else it "should create things" $ pendingWith "requires root"
-        describe "change" $
-            if haveRoot
-                then testChange
-                else it "should change things" $ pendingWith "requires root"
-        describe "destroy" $
-            if haveRoot
-                then testDestroy
-                else it "should destroy things" $ pendingWith "requires root"
+        describe "dump"    testDump
+        describe "create"  testCreate
+        describe "change"  testChange
+        describe "destroy" testDestroy
 
 testDump :: Spec
 testDump = do
@@ -87,7 +77,7 @@ testDump = do
             runRTNL (dump loopback) `shouldReturn` [LinkIndex 1]
 
         it "gets link states" $ do
-            runRTNL (dump loopback) `shouldReturn` [Up]
+            runRTNL (dump loopback) `shouldReturn` [Down]
 
         context "when given a non-existent link name" $ do
             it "throws an exception" $ do
@@ -98,12 +88,12 @@ testDump = do
             runRTNL (dump loopback) `shouldReturn` [LinkEther 0 0 0 0 0 0]
 
         it "gets interface ipv4 addresses" $ do
-            addresses <- runRTNL $ dump AnyInterface
-            addresses `shouldSatisfy` elem localhost4
+            addresses :: [IfInetAddress] <- runRTNL $ dump AnyInterface
+            addresses `shouldSatisfy` null
 
         it "gets interface ipv6 addresses" $ do
-            addresses <- runRTNL $ dump AnyInterface
-            addresses `shouldSatisfy` elem localhost6
+            addresses :: [IfInet6Address] <- runRTNL $ dump AnyInterface
+            addresses `shouldSatisfy` null
 
 testCreate :: Spec
 testCreate = do
