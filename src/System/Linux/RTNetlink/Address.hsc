@@ -30,6 +30,7 @@ module System.Linux.RTNetlink.Address
     , getInet6Address
     , putInetAddress
     , putInet6Address
+    , IfDeleted(..)
     ) where
 
 import Control.Applicative ((<$>), (<*>))
@@ -188,6 +189,7 @@ instance Reply IfInetAddress where
     fromNLMessage    m             =
         IfInetAddress <$> fromNLMessage m <*> fromNLMessage m <*> fromNLMessage m <*> fromNLMessage m
 
+
 -- | An ipv6 address and netmask associated with an interface.
 data IfInet6Address = IfInet6Address
     { ifInet6Address :: Inet6Address -- ^ The ipv6 address itself.
@@ -243,3 +245,11 @@ instance Serialize IfAddrMsg where
         <*> getWord32host
 instance Header IfAddrMsg where
     emptyHeader = IfAddrMsg 0 0 0 0 0
+
+newtype IfDeleted a = IfDeleted a
+    deriving (Eq, Show)
+instance Reply a => Reply (IfDeleted a) where
+    type ReplyHeader (IfDeleted a)  = ReplyHeader a
+    replyTypeNumbers _             = [#{const RTM_DELADDR}]
+    fromNLMessage    m =
+          IfDeleted <$> fromNLMessage m

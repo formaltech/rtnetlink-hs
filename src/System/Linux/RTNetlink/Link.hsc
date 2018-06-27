@@ -171,3 +171,11 @@ instance Serialize IfInfoMsg where
         return $ IfInfoMsg {..}
 instance Header IfInfoMsg where
     emptyHeader = IfInfoMsg 0 0 0
+
+newtype LinkDeleted a = LinkDeleted a
+    deriving (Eq, Show)
+instance Reply a => Reply (LinkDeleted a) where
+    type ReplyHeader (LinkDeleted a)  = ReplyHeader a
+    replyTypeNumbers _             = [#{const RTM_DELLINK}]
+    fromNLMessage    m =
+          LinkDeleted <$> fromNLMessage m

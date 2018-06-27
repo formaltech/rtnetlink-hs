@@ -36,6 +36,7 @@ module System.Linux.RTNetlink.Route (
   , RouteType(..)
   , RouteInfo(..)
   , Route6Info(..)
+  , RouteDeleted(..)
   ) where
 
 import Control.Applicative ((<$>), (<*>))
@@ -533,6 +534,14 @@ instance Serialize RtmMsg where
         <*> getWord32host
 instance Header RtmMsg where
     emptyHeader = RtmMsg 0 0 0 0 0 0 0 0 0
+
+newtype RouteDeleted a = RouteDeleted a
+    deriving (Eq, Show)
+instance Reply a => Reply (RouteDeleted a) where
+    type ReplyHeader (RouteDeleted a)  = ReplyHeader a
+    replyTypeNumbers _             = [#{const RTM_DELROUTE}]
+    fromNLMessage    m =
+          RouteDeleted <$> fromNLMessage m
 
 -- EXAMPLES
 -- default gateway
