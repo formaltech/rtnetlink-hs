@@ -245,7 +245,7 @@ testChange = do
         it "changes link ethernet addresses" $ do
             let weirdEther = LinkEther 0xaa 0xbb 0xcc 0xdd 0xee 0xff
             [eth] <- runRTNL $ do
-                change testLink weirdMAC
+                change testLink weirdEther
                 dump testLink
             eth `shouldBe` weirdEther
 
