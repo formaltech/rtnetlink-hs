@@ -1,4 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-|
 Module      : System.Linux.RTNetlink.Link
 Description : ADTs for creating, destroying, modifying, and getting info
@@ -26,7 +25,6 @@ import Data.Serialize
 import Data.String (IsString)
 import Data.Word (Word8, Word16, Word32)
 import qualified Data.ByteString as S
-import qualified Foreign.C.Error as C
 
 import System.Linux.RTNetlink.Message
 import System.Linux.RTNetlink.Packet
