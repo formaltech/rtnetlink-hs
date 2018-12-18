@@ -1,3 +1,12 @@
+{-|
+Module      : System.Linux.RTNetlink.Util
+Description : Internal utility functions.
+Copyright   : (c) Formaltech Inc. 2017
+License     : BSD3
+Maintainer  : protob3n@gmail.com
+Stability   : experimental
+Portability : Linux
+-}
 module System.Linux.RTNetlink.Util where
 
 import Data.Word (Word8)
