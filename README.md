@@ -32,10 +32,10 @@ import Control.Monad (when)
 main :: IO ()
 main = runRTNL $ do
     let mybridge = LinkName "mybridge"
-    create (Bridge mybridge)
+    create (Bridge, mybridge)
     change mybridge Up
-    state <- dump mybridge
-    when (head state == Up) $
+    state <- dump' mybridge
+    when (state == Up) $
         liftIO (putStrLn "I did it, mom!")
     destroy mybridge
 ```
