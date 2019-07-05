@@ -9,13 +9,16 @@ import System.Linux.RTNetlink.Link
 
 type AllLinkInfo = (LinkIndex
                  , (LinkName
+                 , (LinkEther
+                 , (LinkBroadcastEther
+                 , (Maybe LinkType
+                 , (Maybe VlanId
+                 , (LinkMaster
                  , (LinkMTU
                  , (LinkPromiscuity
                  , (LinkArp
                  , (LinkDebug
-                 , (LinkEther
-                 , (LinkBroadcastEther
-                 ))))))))
+                 )))))))))))
 
 usage :: IO ()
 usage = do
@@ -56,17 +59,17 @@ main = do
 
         "create":"bridge":name':[] -> do
             let name = LinkName $ S.pack name'
-            create $ Bridge name
+            create $ (Bridge, name)
 
         "create":"dummy":name':[] -> do
             let name = LinkName $ S.pack name'
-            create $ Dummy name
+            create $ (Dummy, name)
 
         "create":"vlan":ix':idnum':name':[] -> do
             let ix    = LinkIndex $ read ix'
                 name  = LinkName $ S.pack name'
-                idnum = read idnum'
-            create $ Dot1QVlan ix idnum name
+                idnum = VlanId $ read idnum'
+            create $ (Dot1QVlan ix idnum, name)
 
         "destroy":"name":name':[] -> do
             let name = LinkName $ S.pack name'

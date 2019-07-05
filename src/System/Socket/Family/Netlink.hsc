@@ -21,7 +21,7 @@ module System.Socket.Family.Netlink
     , netlinkKernel
     ) where
 
-import Data.Bits ((.|.))
+import Data.Bits ((.|.), (.&.), shiftL)
 import Data.Functor ((<$>))
 import Data.Serialize (Serialize(..), encode, decode)
 import Data.Serialize (putWord16host, putWord32host, getWord16host, getWord32host)
@@ -29,6 +29,7 @@ import Foreign.Ptr (castPtr)
 import Foreign.Storable (Storable(..))
 import GHC.Word (Word32)
 import System.Posix (getProcessID)
+import System.Random (randomRIO)
 import qualified Data.ByteString.Char8 as S
 
 import System.Socket
@@ -85,7 +86,13 @@ netlinkGroupMask = foldr (.|.) 0 . fmap netlinkGroupNumber
 netlinkAddress :: NetlinkGroup g => [g] -> IO (SocketAddress Netlink)
 netlinkAddress gs = do
     pid <- fromIntegral <$> getProcessID
-    return $ SocketAddressNetlink pid (netlinkGroupMask gs)
+    rid <- randomRIO (linuxPidMax, maxBound)
+    let id' = (pid .&. linuxPidMask) .|. linuxPidShift rid
+    return $ SocketAddressNetlink id' (netlinkGroupMask gs)
+    where
+    linuxPidMax   = 0x00400000 -- Max pid for 64-bit Linux is 2^22 - 1
+    linuxPidMask  = 0x003fffff
+    linuxPidShift = (`shiftL` 22)
 
 -- | Like 'netlinkAddress', but with a configurable source address.
 netlinkAddressPid :: NetlinkGroup g => Word32 -> [g] -> SocketAddress Netlink
