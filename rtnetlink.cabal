@@ -19,7 +19,7 @@ category:           Network, System
 build-type:         Simple
 extra-source-files: ChangeLog.md
 cabal-version:      >=1.10
-homepage:           https://gitlab.com/formaltech/rtnetlink-hs
+homepage:           https://github.com/protoben/rtnetlink.hs
 
 flag examples
     description:    Build example programs
