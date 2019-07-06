@@ -28,11 +28,11 @@ to perform.
 {-# LANGUAGE TypeFamilies #-}
 module System.Linux.RTNetlink.Message where
 
-import Control.Applicative ((<$>), (<*>))
+import Control.Applicative ((<$>), (<*>), (<|>))
 import Control.Monad (guard)
 import Data.Int (Int32)
 import Data.List (nub)
-import Data.Monoid (mempty)
+import Data.Monoid (mempty, (<>))
 import Data.Serialize
 import Data.Word (Word16, Word32)
 import qualified Data.ByteString as S
@@ -49,8 +49,8 @@ type SequenceNumber = Word32
 sequenceNumber :: S.ByteString -> SequenceNumber
 sequenceNumber = either (const 0) nlMsgSeqNum . decode
 
-type TypeNumber     = Word16 -- ^ Message type for an 'NlMsgHdr'.
-type NLFlags        = Word16 -- ^ Top-level flags for an 'NlMsgHdr'.
+type TypeNumber = Word16 -- ^ Message type for an 'NlMsgHdr'.
+type NLFlags    = Word16 -- ^ Top-level flags for an 'NlMsgHdr'.
 
 -- High-level representation of a netlink packet.
 data NLMessage header = NLMessage
@@ -86,125 +86,225 @@ instance Serialize NLMsgErr where
     put NLMsgErr {..} = putInt32host nleError >> put nleHeader
     get               = NLMsgErr <$> getInt32le <*> get
 instance Header NLMsgErr where
+    type HeaderPart NLMsgErr = NLMsgErrPart
+    fromHeaderParts = foldr modify emptyHeader
+        where
+        modify (NLMsgErrError e)  h = h {nleError = e}
+        modify (NLMsgErrHeader g) h = h {nleHeader = g}
     emptyHeader = NLMsgErr 0 $ NLMsgHdr 0 0 0 0 0
+instance ReplyMessageHeader NLMsgErr where
+    replyTypeNumbers _ = [#{const NLMSG_ERROR}]
+
+data NLMsgErrPart
+    = NLMsgErrError  Int32
+    | NLMsgErrHeader NLMsgHdr
+    deriving (Show, Eq)
 
 -- | Class of things that can be used as second-level netlink headers.
 class (Show h, Eq h, Sized h, Serialize h) => Header h where
+    -- | Components for a 'Header', so they can be combined.
+    type HeaderPart h
+    -- | How to construct a 'Header' from a list of @HeaderPart@s. An empty list
+    -- should correspond to 'emptyHeader'.
+    fromHeaderParts :: [HeaderPart h] -> h
     -- | Default header for a message, if none is specified.
     emptyHeader :: h
 instance Header () where
-    emptyHeader = ()
+    type HeaderPart () = ()
+    fromHeaderParts    = mempty
+    emptyHeader        = ()
+
+-- | Class of headers that can be used to create things.
+class Header h => CreateMessageHeader h where
+    -- | The top-level type number associated with create messages with this
+    -- header.
+    createTypeNumber :: h -> TypeNumber
+
+-- | Class of headers that can be used to destroy things.
+class Header h => DestroyMessageHeader h where
+    -- | The top-level type number associated with destroy messages with this
+    -- header.
+    destroyTypeNumber :: h -> TypeNumber
+
+-- | Class of headers that can be used to change things.
+class Header h => ChangeMessageHeader h where
+    -- | The top-level type number associated with change messages with this
+    -- header.
+    changeTypeNumber :: h -> TypeNumber
+
+-- | Class of headers that can be used to request things.
+class Header h => RequestMessageHeader h where
+    -- | The top-level type number associated with request messages with this
+    -- header.
+    requestTypeNumber :: h -> TypeNumber
+
+-- | Class of headers that can be received in reply messages.
+class Header h => ReplyMessageHeader h where
+    -- | The expected top-level type number(s) that mark a packet replies with
+    -- this header can be parsed from.
+    replyTypeNumbers :: h -> [TypeNumber]
+instance ReplyMessageHeader () where
+    replyTypeNumbers () = []
 
 -- | Class of things that can be sent as messages.
 class Header (MessageHeader m) => Message m where
     -- | The type of header to attach to the message.
     type MessageHeader m
-    -- | Construct a header corresponding to a message. Defaults to `emptyHeader`.
-    messageHeader :: m -> MessageHeader m
-    messageHeader = const emptyHeader
-    -- | Construct netlink attributes corresponding to a message. Defaults to `mempty`.
-    messageAttrs  :: m -> AttributeList
-    messageAttrs  = mempty
-    -- | Produce an NLMessage suitable for sending over the wire.
-    toNLMessage   ::
-        m -> TypeNumber -> NLFlags -> SequenceNumber -> NLMessage (MessageHeader m)
-    toNLMessage m = NLMessage (messageHeader m) (messageAttrs m)
+    -- | Parts to construct a header corresponding to a message. Defaults
+    -- to @[]@.
+    messageHeaderParts :: m -> [HeaderPart (MessageHeader m)]
+    messageHeaderParts = mempty
+    -- | Construct netlink attributes corresponding to a message. Defaults
+    -- to @[]@.
+    messageAttrs :: m -> AttributeList
+    messageAttrs = mempty
     {-# MINIMAL #-}
+instance (Message m, Message n, MessageHeader m ~ MessageHeader n)
+    => Message (m,n) where
+    type MessageHeader (m,n) = MessageHeader m
+    messageHeaderParts (m,n) = messageHeaderParts m <> messageHeaderParts n
+    messageAttrs       (m,n) = messageAttrs m <> messageAttrs n
+
+-- | Produce a 'MessageHeader' from a 'Message' using 'messageHeaderParts'.
+messageHeader :: Message m => m -> MessageHeader m
+messageHeader = fromHeaderParts . messageHeaderParts
+
+-- | Produce an 'NLMessage' suitable for sending over the wire.
+toNLMessage :: Message m => m -> (MessageHeader m -> TypeNumber)
+    -> NLFlags -> SequenceNumber -> NLMessage (MessageHeader m)
+toNLMessage m typeNumber = NLMessage header (messageAttrs m) (typeNumber header)
+    where header = messageHeader m
 
 -- | Class of 'Message's representing things that can be created.
-class Message c => Create c where
-    -- | The top-level type number associated with creating with this message.
-    createTypeNumber :: c -> TypeNumber
-    -- | Produce an NLMessage suitable for sending over the wire.
-    createNLMessage  :: c -> SequenceNumber -> NLMessage (MessageHeader c)
-    createNLMessage c = toNLMessage c (createTypeNumber c) flags
-        where flags = #{const NLM_F_REQUEST | NLM_F_ACK | NLM_F_CREATE | NLM_F_EXCL}
-    {-# MINIMAL createTypeNumber #-}
+class (Message c, CreateMessageHeader (MessageHeader c)) => Create c
+instance {-# Overlappable #-} (Create c, Create d,
+    MessageHeader c ~ MessageHeader d) => Create (c,d)
+
+-- | Produce an NLMessage suitable for sending over the wire.
+createNLMessage :: Create c => c -> SequenceNumber -> NLMessage (MessageHeader c)
+createNLMessage c = toNLMessage c createTypeNumber flags
+    where flags = #{const NLM_F_REQUEST | NLM_F_ACK | NLM_F_CREATE | NLM_F_EXCL}
 
 -- | Class of 'Message's representing things that can be destroyed.
-class Message d => Destroy d where
-    -- | The top-level type number associated with destroying with this
-    -- message.
-    destroyTypeNumber :: d -> TypeNumber
-    -- | Produce an NLMessage suitable for sending over the wire.
-    destroyNLMessage  :: d -> SequenceNumber -> NLMessage (MessageHeader d)
-    destroyNLMessage d = toNLMessage d (destroyTypeNumber d) flags
-        where flags = #{const NLM_F_REQUEST | NLM_F_ACK}
-    {-# MINIMAL destroyTypeNumber #-}
+class (Message d, DestroyMessageHeader (MessageHeader d)) => Destroy d
+instance (Destroy d, Destroy e, MessageHeader d ~ MessageHeader e)
+    => Destroy (d,e)
+
+-- | Produce an NLMessage suitable for sending over the wire.
+destroyNLMessage :: Destroy d => d -> SequenceNumber -> NLMessage (MessageHeader d)
+destroyNLMessage d = toNLMessage d destroyTypeNumber flags
+    where flags = #{const NLM_F_REQUEST | NLM_F_ACK}
 
 -- | Class of 'Message's representing pairs of identifying messages and
 -- quality that can be modified.
-class Message id => Change id c where
-    -- | The top-level type number associated with changing things with this
-    -- message.
-    changeTypeNumber :: id -> c -> TypeNumber
-    -- | Construct a header from an identifier and a quality. Should probably
-    -- use the identifying message's 'messageHeader'.
-    changeHeader     :: id -> c -> MessageHeader id
-    -- | Construct aattributes from an identifier and a quality. Should
-    -- probably use the identifying message's 'messageAttrs'.
-    changeAttrs      :: id -> c -> AttributeList
-    -- | Produce an NLMessage suitable for sending over the wire.
-    changeNLMessage  :: id -> c -> SequenceNumber -> NLMessage (MessageHeader id)
-    changeNLMessage i c = 
-        NLMessage (changeHeader i c) (changeAttrs i c) (changeTypeNumber i c) flags
-        where flags  = #{const NLM_F_REQUEST | NLM_F_ACK}
-    {-# MINIMAL changeTypeNumber, changeHeader, changeAttrs #-}
+class (Message id, ChangeMessageHeader (MessageHeader id)) => Change id c where
+    -- | Construct a list of 'HeaderPart's from an identifier and a quality. By
+    -- default, use the identifying message's 'messageHeaderParts'.
+    changeHeaderParts :: id -> c -> [HeaderPart (MessageHeader id)]
+    changeHeaderParts i _ = messageHeaderParts i
+    -- | Construct an 'AttributeList' from an identifier and a quality. By
+    -- default, use the identifying message's 'messageAttrs'.
+    changeAttrs :: id -> c -> AttributeList
+    changeAttrs i _ = messageAttrs i
+    {-# MINIMAL #-}
+instance (Change id c, Change id d) => Change id (c,d) where
+    changeHeaderParts id (c,d) =
+        changeHeaderParts id c <> changeHeaderParts id d
+    changeAttrs id (c,d) = changeAttrs id c <> changeAttrs id d
+instance (Change id1 c, Change id2 c, MessageHeader id1 ~ MessageHeader id2)
+    => Change (id1,id2) c where
+    changeHeaderParts (id1,id2) c =
+        changeHeaderParts id1 c <> changeHeaderParts id2 c
+    changeAttrs (id1,id2) c = changeAttrs id1 c <> changeAttrs id2 c
+
+-- | Produce an NLMessage suitable for sending over the wire.
+changeNLMessage :: Change id c => id -> c -> SequenceNumber
+    -> NLMessage (MessageHeader id)
+changeNLMessage i c = 
+    NLMessage header (changeAttrs i c) (changeTypeNumber header) flags
+    where
+    header = fromHeaderParts $ changeHeaderParts i c
+    flags  = #{const NLM_F_REQUEST | NLM_F_ACK}
 
 -- | Class of 'Message's that can serve as requests.
-class Message r => Request r where
-    -- | The top-level type number associated with requesting things with this
-    -- message.
-    requestTypeNumber :: r -> TypeNumber
+class (Message r, RequestMessageHeader (MessageHeader r)) => Request r where
     -- | The top-level flags associated with this request.
-    requestNLFlags    :: r -> NLFlags
-    requestNLFlags = const #{const NLM_F_REQUEST}
-    -- | Produce an NLMessage suitable for sending over the wire.
-    requestNLMessage  :: r -> SequenceNumber -> NLMessage (MessageHeader r)
-    requestNLMessage r = toNLMessage r (requestTypeNumber r) (requestNLFlags r)
-    {-# MINIMAL requestTypeNumber #-}
+    requestNLFlags :: r -> ChangeFlags NLFlags
+    {-# MINIMAL requestNLFlags #-}
+instance (Request r, Request s, MessageHeader r ~ MessageHeader s)
+    => Request (r,s) where
+    -- | If either 'Request' instance demands a single 'Reply', any tuple
+    -- containing it should also demand a single 'Reply'. Otherwise we combine
+    -- the 'requestNLFlags' of each tuple element.
+    requestNLFlags (r,s) = if rFlags == dumpOne r || sFlags == dumpOne s
+        then dumpOne r
+        else rFlags <> sFlags
+        where
+        rFlags = requestNLFlags r
+        sFlags = requestNLFlags s
 
--- | The default request flags assume that the request identifies a single
--- entity. When requesting information for multiple entities, overload
--- 'requestNLFlags' with these.
-dumpNLFlags :: NLFlags
-dumpNLFlags = #{const NLM_F_REQUEST | NLM_F_DUMP}
+-- | Produce an 'NLMessage' suitable for sending over the wire.
+requestNLMessage :: Request r => r -> SequenceNumber
+    -> NLMessage (MessageHeader r)
+requestNLMessage r = toNLMessage r requestTypeNumber flags
+    where flags = applyChangeFlags' $ requestNLFlags r
+
+-- | Top-level flags to indicate that calling 'dump' is expected to yield a
+-- single 'Reply'.
+dumpOne :: a -> ChangeFlags NLFlags
+dumpOne = const $
+    ChangeFlags #{const NLM_F_REQUEST} #{const NLM_F_REQUEST | NLM_F_DUMP}
+
+-- | Top-level flags to indicate that calling 'dump' is expected to yield a
+-- multiple 'Reply's.
+dumpMany :: a -> ChangeFlags NLFlags
+dumpMany = const $ setChangeFlags #{const NLM_F_REQUEST | NLM_F_DUMP}
 
 -- | Class of things that can be received.
-class Header (ReplyHeader r) => Reply r where
+class ReplyMessageHeader (ReplyHeader r) => Reply r where
     -- | The type of header associated with this 'Reply'.
     type ReplyHeader r
-    -- | The expected top-level type number(s) that mark a packet this reply
-    -- can be parsed from.
-    replyTypeNumbers :: r -> [TypeNumber]
     -- | Interpret a received NLMessage.
-    fromNLMessage    :: NLMessage (ReplyHeader r) -> Maybe r
+    fromNLMessage :: NLMessage (ReplyHeader r) -> Maybe r
     -- | Like 'fromNLMessage', but checks to make sure the top-level type
     -- number is in 'replyTypeNumbers', first.
-    {-# MINIMAL replyTypeNumbers, fromNLMessage #-}
+    {-# MINIMAL fromNLMessage #-}
 instance Reply () where
     type ReplyHeader () = ()
-    replyTypeNumbers () = []
     fromNLMessage    _  = Nothing
-instance (Reply r, Reply s, ReplyHeader r ~ ReplyHeader s) => Reply (r,s) where
-    type ReplyHeader (r,s) = ReplyHeader r
-    replyTypeNumbers (r,s) = nub $ replyTypeNumbers r ++ replyTypeNumbers s
-    fromNLMessage    m     = (,) <$> fromNLMessage m <*> fromNLMessage m
 instance Reply C.Errno where
     type ReplyHeader C.Errno = NLMsgErr
-    replyTypeNumbers _       = [#{const NLMSG_ERROR}]
-    fromNLMessage            = Just . C.Errno . abs . fromIntegral . nleError . nlmHeader
+    fromNLMessage = Just . C.Errno . abs . fromIntegral . nleError . nlmHeader
+instance Reply r => Reply (Maybe r) where
+    type ReplyHeader (Maybe r) = ReplyHeader r
+    fromNLMessage m = return $ fromNLMessage m
+instance (Reply r, Reply s, ReplyHeader r ~ ReplyHeader s)
+    => Reply (Either r s) where
+    type ReplyHeader (Either r s) = ReplyHeader r
+    fromNLMessage m = Left <$> fromNLMessage m <|> Right <$> fromNLMessage m
+instance (Reply r, Reply s, ReplyHeader r ~ ReplyHeader s) => Reply (r,s) where
+    type ReplyHeader (r,s) = ReplyHeader r
+    fromNLMessage m = (,) <$> fromNLMessage m <*> fromNLMessage m
+
+class (Request q, Reply r) => Dump q r
+instance Request q => Dump q ()
+instance Request q => Dump q C.Errno
+instance (Request r, Reply r) => Dump r r
+instance Dump q r => Dump q (Maybe r)
+instance (Dump q r, Dump q s, ReplyHeader r ~ ReplyHeader s)
+    => Dump q (Either r s)
+instance (Dump q r1, Dump q r2, ReplyHeader r1 ~ ReplyHeader r2)
+    => Dump q (r1,r2)
+instance (Dump q1 r, Dump q2 r, MessageHeader q1 ~ MessageHeader q2)
+    => Dump (q1,q2) r
+instance {-# Overlapping #-} (Dump q1 r1, Dump q2 r2,
+    MessageHeader q1 ~ MessageHeader q2, ReplyHeader r1 ~ ReplyHeader r2)
+    => Dump (q1,q2) (r1,r2)
+instance {-# Overlappable #-} (Request q, Reply r,
+    MessageHeader q ~ ReplyHeader r) => Dump q r
 
 fromNLMessage' :: Reply r => NLMessage (ReplyHeader r) -> Maybe r
 fromNLMessage' m = do
     r <- fromNLMessage m
-    guard $ nlmType m `elem` replyTypeNumbers r
+    guard $ nlmType m `elem` replyTypeNumbers (nlmHeader m)
     return r
-
--- Util
-
-decodeMaybe :: Serialize a => S.ByteString -> Maybe a
-decodeMaybe = either (const Nothing) Just . decode
-
-runGetMaybe :: Get a -> S.ByteString -> Maybe a
-runGetMaybe g = either (const Nothing) Just . runGet g

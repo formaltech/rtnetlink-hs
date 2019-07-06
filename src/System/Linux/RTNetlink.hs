@@ -39,10 +39,10 @@ functions to make this easier.
 >   main :: IO ()
 >   main = runRTNL $ do
 >       let mybridge = LinkName "mybridge"
->       create (Bridge mybridge)
+>       create (Bridge, mybridge)
 >       change mybridge Up
->       state <- dump mybridge
->       when (head state == Up) $
+>       state <- dump' mybridge
+>       when (state == Up) $
 >           liftIO (putStrLn "I did it, mom!")
 >       destroy mybridge
 -}
@@ -58,6 +58,7 @@ module System.Linux.RTNetlink (
     , create
     , destroy
     , dump
+    , dump'
     , change
     , getBacklog
     , clearBacklog
@@ -72,10 +73,11 @@ module System.Linux.RTNetlink (
 
 import Control.Applicative (Applicative(..), (<$>))
 import Control.Monad (when, void)
+import Control.Monad.Catch (MonadThrow, MonadCatch, MonadMask)
+import Control.Monad.Catch (throwM, try, handle, bracket)
 import Control.Monad.IO.Class (MonadIO(..))
-import Control.Monad.Loops (unfoldM)
-import Control.Monad.State (MonadState, StateT, evalStateT)
-import Control.Monad.State (get, gets, put, modify, modify')
+import Control.Monad.Trans.State.Strict (StateT, evalStateT)
+import Control.Monad.Trans.State.Strict (get, gets, put, modify, modify')
 import Data.Monoid (mempty)
 import Data.Either (partitionEithers)
 import Data.List (partition)
@@ -87,11 +89,11 @@ import System.Socket (Socket, MessageFlags, SocketException(..))
 import System.Socket (socket, bind, send, receive, close)
 import System.Socket.Type.Raw (Raw)
 import System.Timeout (timeout)
-import qualified Control.Exception as X
 import qualified Data.ByteString as S
 
 import System.Linux.RTNetlink.Message
 import System.Linux.RTNetlink.Packet
+import System.Linux.RTNetlink.Util
 import System.Socket.Family.Netlink
 import System.Socket.Protocol.RTNetlink
 
@@ -103,13 +105,20 @@ data Handle = Handle
     }
 
 -- | RTNL monad to simplify netlink communication.
-newtype RTNL a = RTNL {unRTNL :: StateT Handle IO a}
-    deriving (Functor, Applicative, Monad, MonadIO, MonadState Handle)
+newtype RTNL a = RTNL {unRTNL :: StateT Handle IO a} deriving
+    ( Functor
+    , Applicative
+    , Monad
+    , MonadIO
+    , MonadCatch
+    , MonadThrow
+    , MonadMask
+    )
 
 -- | Run an RTNL function and catch all @IOError@s. This means that functions
 -- in this module are guaranteed not to throw uncaught exceptions.
 tryRTNL :: RTNL a -> IO (Either String a)
-tryRTNL = fmap (left (\e -> show (e::IOError))) . X.try . runRTNL
+tryRTNL = fmap (left (\e -> show (e::IOError))) . try . runRTNL
 
 -- | Run an RTNL function. RTNL functions in this module throw exclusively
 -- @IOError@s.
@@ -118,7 +127,7 @@ runRTNL = runRTNLGroups []
 
 -- | Run an RTNL function and specify some groups to subscribe to.
 runRTNLGroups :: [RTNetlinkGroup] -> RTNL a -> IO a
-runRTNLGroups gs r = X.bracket (rethrow "socket" socket) close $ \s -> do
+runRTNLGroups gs r = bracket (rethrow "socket" socket) close $ \s -> do
     rethrow "bind" $ bind s =<< netlinkAddress gs
     h <- Handle s [] False <$> randomIO
     evalStateT (unRTNL r) h
@@ -152,7 +161,7 @@ talk m = do
     let (bss',rs) = partitionEithers $ fmap tryDecodeReply bss
         (_,es)    = partitionEithers $ fmap tryDecodeReply bss'
     case filter (/=eOK) es of
-        e:_ -> liftIO . X.throwIO $ errnoToIOError "RTNETLINK answers" e Nothing Nothing
+        e:_ -> throwM $ errnoToIOError "RTNETLINK answers" e Nothing Nothing
         _   -> return rs
 
 -- | Like 'talk', but discards non-error 'Reply's.
@@ -168,8 +177,16 @@ destroy :: Destroy d => d -> RTNL ()
 destroy = talk_ . destroyNLMessage
 
 -- | Send a 'Request' and receive the associated 'Reply's.
-dump :: (Request q, Reply r) => q -> RTNL [r]
+dump :: Dump q r => q -> RTNL [r]
 dump = talk . requestNLMessage
+
+-- | Link 'dump', but throws 'IOError' if the 'Reply' list does not have exactly
+-- one element.
+dump' :: Dump q r => q -> RTNL r
+dump' q = dump q >>= \l -> case l of
+    e:[] -> return e
+    _:_  -> throwM $ userError "`dumpOne' returned non-unique"
+    []   -> throwM $ userError "`dumpOne' returned empty"
 
 -- | Send a 'Change' message and ignore non-error 'Reply's.
 change :: Change id c => id -> c -> RTNL ()
@@ -216,9 +233,6 @@ receiveAll :: Socket f t p -> Int -> MessageFlags -> IO [S.ByteString]
 receiveAll s n f = unfoldM . timeout 500 . rethrow "receive" $ receive s n f
 
 -- | Re-throw a SocketException as an IOError.
-rethrow :: String -> IO a -> IO a
-rethrow name = X.handle $ \(SocketException n) ->
-    X.throwIO $ errnoToIOError name (Errno n) Nothing Nothing
-
-left :: (a -> b) -> Either a c -> Either b c
-left f = either (Left . f) Right
+rethrow :: MonadCatch m => String -> m a -> m a
+rethrow name = handle $ \(SocketException n) ->
+    throwM $ errnoToIOError name (Errno n) Nothing Nothing

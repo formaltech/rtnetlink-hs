@@ -1,0 +1,13 @@
+dist: xenial
+language: haskell
+ghc:
+    - "8.0"
+    - "8.2.2"
+    - "8.4.4"
+    - "8.6.4"
+    - "8.6.5"
+addon:
+    apt:
+        update: true
+        packages:
+            - linux-libc-dev

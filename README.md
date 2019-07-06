@@ -1,6 +1,8 @@
 # RTNetlink
 
-RTNetlink is an extensible, high-level, pure Haskell interface for manipulating
+[![Build Status](https://travis-ci.org/protoben/rtnetlink-hs.svg?branch=master)](https://travis-ci.org/protoben/rtnetlink-hs)
+
+RTNetlink is an extensible, high-level, pure-Haskell interface for manipulating
 network interfaces on Linux: creating and destroying interfaces, changing and
 dumping interface settings, adding and removing addresses.
 
@@ -9,10 +11,10 @@ lifting of opening and closing netlink sockets, incrementing sequence numbers,
 and getting the responses for the current sequence number behind the scenes.
 Messages not that are not responses to a sent message, such as those sent to
 group subscribers, are stored in the backlog and can be retrieved with
-'getBacklog'.
+`getBacklog`.
 
 The basic way to use `RTNL` is to use the `create`, `destroy`, `dump`, and
-`change` convenience functions. If you want more control, you can use 'talk'
+`change` convenience functions. If you want more control, you can use `talk`
 and `talk_`. Import modules like `System.Linux.RTNetlink.Link` to get access
 to prefab instances of `Create` and `Destroy` messages, etc. Or import
 `System.Linux.RTNetlink.Message` to get access to the core typeclasses and
@@ -32,10 +34,10 @@ import Control.Monad (when)
 main :: IO ()
 main = runRTNL $ do
     let mybridge = LinkName "mybridge"
-    create (Bridge mybridge)
+    create (Bridge, mybridge)
     change mybridge Up
-    state <- dump mybridge
-    when (head state == Up) $
+    state <- dump' mybridge
+    when (state == Up) $
         liftIO (putStrLn "I did it, mom!")
     destroy mybridge
 ```
