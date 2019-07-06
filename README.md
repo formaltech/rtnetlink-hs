@@ -1,5 +1,7 @@
 # RTNetlink
 
+[![Build Status](https://travis-ci.org/protoben/rtnetlink-hs.svg?branch=master)](https://travis-ci.org/protoben/rtnetlink-hs)
+
 RTNetlink is an extensible, high-level, pure-Haskell interface for manipulating
 network interfaces on Linux: creating and destroying interfaces, changing and
 dumping interface settings, adding and removing addresses.
